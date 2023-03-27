@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/sysyc.dir/sysyc.cpp.o CMakeFiles/sysyc.dir/ASTPrinter.cpp.o -o ../bin/sysyc  -Wl,-rpath,/home/healer/MyWorkSpace/Exp/Exp1/sysy/build/lib ../lib/libSysYParser.so ../lib/libantlr4-runtime.so.4.12.0 

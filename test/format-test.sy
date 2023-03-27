@@ -1,0 +1,55 @@
+int get_one(int a)
+{
+  return 1;
+}
+
+int aaa = 123;
+
+int deepWhileBr(int a,int b[][2+3*5][2*2]){
+  int c;
+  float aa;
+  aa = 1.33;
+  aa = .3;
+  aa = 3.2e4;
+  aa = 3.3E3;
+  aa = 3.;
+  aa = 3e3;
+  aa = 3E3;
+  aa = 0x2A.P-3;
+  aa = 0X2A.P3;
+  aa = 0x.2AP-3;
+  aa = 0X.2AP3;
+  aa = 0x2AP-3;
+  aa = 0x2AP3;
+  aa = 3;
+    c = a + b;
+  while(c<75) {
+  int d; d=42;
+    if (c<100) {
+      c =c+d;
+      if (c > 99) {
+        int e;
+        e = d*2;
+        if (get_one(0)==1) c=e * 2;
+        else c=c+1;
+      }
+    }
+  }
+  while(c>=2)
+  	c=3;
+ int i = -1;
+  while(1)
+  {
+  	if(i>5)
+  		break;
+  	if(i<0)continue;
+  }
+  return (c);
+} float bbb = 28;
+int main() {
+  int p;
+  p = 2;
+  p = deepWhileBr(p, p);
+  putint(p);
+  return 0;
+}
