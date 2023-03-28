@@ -1,3 +1,12 @@
+/**
+ * @file SymbolTable.cpp
+ * @brief 符号表的定义。声明见SymbolTable.h
+ * @author Rhein_E
+ * @version 1.0
+ * @date 2023-03-28
+ * 
+ * @details 实现方式：通过std::map将符号的名字(std::string)映射到SymbolInfo对象（以指针的形式）。
+ */
 #include "SymbolTable.h"
 
 namespace sysy {
@@ -52,35 +61,3 @@ SymbolTable::~SymbolTable() {
 }
 
 } // namespace sysy
-
-/* example
-#include "SymbolTable.h"
-
-using namespace sysy;
-
-SymbolTable tb;
-
-int main() {
-    // 插入一个整型x，并设置信息
-    if (!tb.insert("x"))
-        std::cout << "error\n";
-    else {
-        SymbolInfo *pinfo = tb.query("x");
-        pinfo->type = INT;
-        pinfo->addr = 0x4000064;
-    }
-
-    // 插入一个函数func，并设置信息
-    if (!tb.insert("func"))
-        std::cout << "error\n";
-    else {
-        SymbolInfo *pinfo = tb.query("func");
-        pinfo->type = FUNC;
-        pinfo->addr = 0x1000000;
-    }
-
-    tb.view();
-
-    return 0;
-}
-*/
