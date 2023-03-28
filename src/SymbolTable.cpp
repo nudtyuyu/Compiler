@@ -4,7 +4,7 @@ namespace sysy {
 
 SymbolInfo::SymbolInfo() {
     type = NONE;
-    addr = 0;
+    addr = 0x0;
 }
 bool SymbolTable::insert(const std::string &name) {
     if (table.find(name) != table.end())
