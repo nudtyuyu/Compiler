@@ -140,14 +140,54 @@ any SysYIRGenerator::visitEqExp(SysYParser::EqExpContext* ctx)
 		Value* eqterm = any_cast<Value *>(visitEqExp(ctx->eqExp()));
 		Value* relterm = any_cast<Value *>(visitRelExp(ctx->relExp()));
 		//lor = builder.create... undefine,waiting
-		if(ctx->Equal())
+		if(eqterm->isInt() && relterm->isInt())
 		{
-			return builder.createICmpEQInst(eqterm,relterm);
+			if(ctx->Equal())
+			{
+				return builder.createICmpEQInst(eqterm,relterm);
+			}
+			else if(ctx->NonEqual())
+			{
+				return builder.createICmpNEInst(eqterm,relterm);
+			}
 		}
-		else if(ctx->NonEqual())
+		else if(eqterm->isInt() && relterm->isFloat())
 		{
-			return builder.createICmpNEInst(eqterm,relterm);
+			builder.createIToFInst(eqterm);
+			if(ctx->Equal())
+			{
+				return builder.createFCmpEQInst(eqterm,relterm);
+			}
+			else if(ctx->NonEqual())
+			{
+				return builder.createFCmpNEInst(eqterm,relterm);
+			}
 		}
+		else if(eqterm->isFloat() && relterm->isInt())
+		{
+			builder.createIToFInst(relterm);
+			if(ctx->Equal())
+			{
+				return builder.createFCmpEQInst(eqterm,relterm);
+			}
+			else if(ctx->NonEqual())
+			{
+				return builder.createFCmpNEInst(eqterm,relterm);
+			}
+		}
+		else if(eqterm->isFloat() && relterm->isFloat())
+		{
+			//builder.createIToF(eqterm);
+			if(ctx->Equal())
+			{
+				return builder.createFCmpEQInst(eqterm,relterm);
+			}
+			else if(ctx->NonEqual())
+			{
+				return builder.createFCmpNEInst(eqterm,relterm);
+			}
+		}
+		
 			
 	}
 	return nullptr;
@@ -168,22 +208,86 @@ any SysYIRGenerator::visitRelExp(SysYParser::RelExpContext* ctx)
 		Value* addterm = any_cast<Value *>(visitAddExp(ctx->addExp()));
 		Value* relterm = any_cast<Value *>(visitRelExp(ctx->relExp()));
 		//lor = builder.create... undefine,waiting
-		if(ctx->LessThan())
+		if(addterm->isInt() && relterm->isInt())
 		{
-			return builder.createICmpLTInst(relterm,addterm);
+			if(ctx->LessThan())
+			{
+				return builder.createICmpLTInst(relterm,addterm);
+			}
+			else if(ctx->GreaterThan())
+			{
+				return builder.createICmpGTInst(relterm,addterm);
+			}
+			else if(ctx->LessEqual())
+			{
+				return builder.createICmpLEInst(relterm,addterm);
+			}
+			else if(ctx->GreaterEqual())
+			{
+				return builder.createICmpGEInst(relterm,addterm);
+			}	
 		}
-		else if(ctx->GreaterThan())
+		else if(addterm->isFloat() && relterm->isInt())
 		{
-			return builder.createICmpGTInst(relterm,addterm);
+			builder.createIToFInst(relterm);
+			if(ctx->LessThan())
+			{
+				return builder.createFCmpLTInst(relterm,addterm);
+			}
+			else if(ctx->GreaterThan())
+			{
+				return builder.createFCmpGTInst(relterm,addterm);
+			}
+			else if(ctx->LessEqual())
+			{
+				return builder.createFCmpLEInst(relterm,addterm);
+			}
+			else if(ctx->GreaterEqual())
+			{
+				return builder.createFCmpGEInst(relterm,addterm);
+			}	
 		}
-		else if(ctx->LessEqual())
+		else if(addterm->isInt() && relterm->isFloat())
 		{
-			return builder.createICmpLEInst(relterm,addterm);
+			builder.createIToFInst(addterm);
+			if(ctx->LessThan())
+			{
+				return builder.createFCmpLTInst(relterm,addterm);
+			}
+			else if(ctx->GreaterThan())
+			{
+				return builder.createFCmpGTInst(relterm,addterm);
+			}
+			else if(ctx->LessEqual())
+			{
+				return builder.createFCmpLEInst(relterm,addterm);
+			}
+			else if(ctx->GreaterEqual())
+			{
+				return builder.createFCmpGEInst(relterm,addterm);
+			}	
 		}
-		else if(ctx->GreaterEqual())
+		else if(addterm->isFloat() && relterm->isFloat())
 		{
-			return builder.createICmpGEInst(relterm,addterm);
+			//builder.createIToFInst(relterm);
+			if(ctx->LessThan())
+			{
+				return builder.createFCmpLTInst(relterm,addterm);
+			}
+			else if(ctx->GreaterThan())
+			{
+				return builder.createFCmpGTInst(relterm,addterm);
+			}
+			else if(ctx->LessEqual())
+			{
+				return builder.createFCmpLEInst(relterm,addterm);
+			}
+			else if(ctx->GreaterEqual())
+			{
+				return builder.createFCmpGEInst(relterm,addterm);
+			}	
 		}
+		
 			
 	}
 	return nullptr;
@@ -217,14 +321,6 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 		cout<<"visitadd:getaddterm"<<endl;
 		Value* multerm = any_cast<Value *>(visitMulExp(ctx->mulExp())); //wait
 		cout<<"visitadd:getmulterm"<<endl;
-		if(addterm)
-		{
-			cout<<"I have valid addterm"<<endl;
-		}
-		if(multerm)
-		{
-			cout<<"I have valid multerm"<<endl;
-		}
 		if(addterm->isInt() && multerm->isInt())
 		{
 			if(ctx->Add())
@@ -244,7 +340,7 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 		else if(addterm->isFloat() && multerm->isInt())
 		{
 			cout<<"float!"<<endl;
-			builder.createIToFInst(addterm);
+			builder.createIToFInst(multerm);
 			if(ctx->Add())
 			{
 				cout<<"getfloatadd"<<endl;
@@ -261,7 +357,25 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 		else if(addterm->isInt() && multerm->isFloat())
 		{
 			cout<<"float!"<<endl;
-			auto newmul = (Value *)builder.createIToFInst(multerm);
+			builder.createIToFInst(addterm);
+			if(ctx->Add())
+			{
+				cout<<"getfloatadd"<<endl;
+				auto add = builder.createFAddInst(addterm, multerm); //name????
+			
+				return add;
+			}
+			else if(ctx->Sub())
+			{
+				auto sub = builder.createFSubInst(addterm, multerm); //name????
+				cout<<"getfloatsub"<<endl;
+				return sub;
+			}
+		}
+		else if(addterm->isFloat() && multerm->isFloat())
+		{
+			cout<<"float!"<<endl;
+			//builder.createIToFInst(multerm);
 			if(ctx->Add())
 			{
 				cout<<"getfloatadd"<<endl;
@@ -298,25 +412,102 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 		Value* unaryterm = any_cast<Value *>(visitUnaryExp(ctx->unaryExp()));
 		Value* multerm = any_cast<Value *>(visitMulExp(ctx->mulExp()));
 		// Type tansfer
-		if(ctx->Mul())
+		if(unaryterm->isInt() && multerm->isInt())
 		{
-			auto mul = builder.createMulInst(multerm,unaryterm);
-			cout<<"getmul"<<endl;
-			return mul;
-		}
-		else if(ctx->Div())
-		{
-			auto div = builder.createDivInst(multerm,unaryterm);
-			cout<<"getdiv"<<endl;
-			return div;
-		}
-		else if(ctx->Mod())
-		{
+			if(ctx->Mul())
+			{
+				auto mul = builder.createMulInst(multerm,unaryterm);
+				cout<<"getmul"<<endl;
+				return mul;
+			}
+			else if(ctx->Div())
+			{
+				auto div = builder.createDivInst(multerm,unaryterm);
+				cout<<"getdiv"<<endl;
+				return div;
+			}
+			else if(ctx->Mod())
+			{
 			
-			auto mod = builder.createRemInst(multerm,unaryterm);
-			cout<<"getmod"<<endl;
-			return mod;
+				auto mod = builder.createRemInst(multerm,unaryterm);
+				cout<<"getmod"<<endl;
+				return mod;
+			}
 		}
+		else if(unaryterm->isFloat() && multerm->isInt())
+		{
+			cout<<"floatunary!"<<endl;
+			builder.createIToFInst(multerm);
+			if(ctx->Mul())
+			{
+				auto mul = builder.createFMulInst(multerm,unaryterm);
+				cout<<"getmul"<<endl;
+				return mul;
+			}
+			else if(ctx->Div())
+			{
+				auto div = builder.createFDivInst(multerm,unaryterm);
+				cout<<"getdiv"<<endl;
+				return div;
+			}
+			else if(ctx->Mod())
+			{
+			
+				auto mod = builder.createFRemInst(multerm,unaryterm);
+				cout<<"getmod"<<endl;
+				return mod;
+			}
+		}
+		else if(unaryterm->isInt() && multerm->isFloat())
+		{
+			cout<<"floatmul!"<<endl;
+			builder.createIToFInst(unaryterm);
+			if(ctx->Mul())
+			{
+				auto mul = builder.createFMulInst(multerm,unaryterm);
+				cout<<"getmul"<<endl;
+				return mul;
+			}
+			else if(ctx->Div())
+			{
+				auto div = builder.createFDivInst(multerm,unaryterm);
+				cout<<"getdiv"<<endl;
+				return div;
+			}
+			else if(ctx->Mod())
+			{
+			
+				auto mod = builder.createFRemInst(multerm,unaryterm);
+				cout<<"getmod"<<endl;
+				return mod;
+			}
+		}
+		else if(unaryterm->isFloat() && multerm->isFloat())
+		{
+			cout<<"floatmul!"<<endl;
+			//builder.createIToFInst(multerm);
+			if(ctx->Mul())
+			{
+				auto mul = builder.createFMulInst(multerm,unaryterm);
+				cout<<"getmul"<<endl;
+				return mul;
+			}
+			else if(ctx->Div())
+			{
+				auto div = builder.createFDivInst(multerm,unaryterm);
+				cout<<"getdiv"<<endl;
+				return div;
+			}
+			else if(ctx->Mod())
+			{
+			
+				auto mod = builder.createFRemInst(multerm,unaryterm);
+				cout<<"getmod"<<endl;
+				return mod;
+			}
+		}
+		
+		
 		
 	}
 	return nullptr;
@@ -349,26 +540,53 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 	else if(UnaryOp_child != nullptr)
 	{
 		Value* term = any_cast<Value *>(visitUnaryExp(ctx->unaryExp()));
-		if(ctx->unaryOp()->Add())
+		if(term->isInt())
 		{
+			if(ctx->unaryOp()->Add())
+			{
 			
-			//create
-			cout<<"PositiveUnary: wait for edit!"<<endl;
+				//create
+				cout<<"PositiveUnary: wait for edit!"<<endl;
+			}
+			else if(ctx->unaryOp()->Sub())
+			{
+				// Type! Int or Float!
+				auto unary = builder.createNegInst(term);
+				cout<<"getunarysub"<<endl;
+				return unary;
+			}
+			else if(ctx->unaryOp()->Not())
+			{
+				// Type! Int or Float!
+				auto unary = builder.createNotInst(term);
+				cout<<"getunarynot"<<endl;
+				return unary;
+			}
 		}
-		else if(ctx->unaryOp()->Sub())
+		if(term->isFloat())
 		{
-			// Type! Int or Float!
-			auto unary = builder.createNegInst(term);
-			cout<<"getunarysub"<<endl;
-			return unary;
+			if(ctx->unaryOp()->Add())
+			{
+			
+				//create
+				cout<<"PositiveUnary: wait for edit!"<<endl;
+			}
+			else if(ctx->unaryOp()->Sub())
+			{
+				// Type! Int or Float!
+				auto unary = builder.createFNegInst(term);
+				cout<<"getunarysub"<<endl;
+				return unary;
+			}
+			else if(ctx->unaryOp()->Not())
+			{
+				// Type! Int or Float!
+				auto unary = builder.createNotInst(term);
+				cout<<"getunarynot"<<endl;
+				return unary;
+			}
 		}
-		else if(ctx->unaryOp()->Not())
-		{
-			// Type! Int or Float!
-			auto unary = builder.createNotInst(term);
-			cout<<"getunarynot"<<endl;
-			return unary;
-		}
+		
 		
 	}
 	return nullptr;
@@ -426,7 +644,6 @@ any SysYIRGenerator::visitNumber(SysYParser::NumberContext *ctx)
 	}
 	return nullptr;
 }
-
 /*any SysYIRGenerator::visitModule(SysYParser::ModuleContext *ctx) {
   auto pModule = new Module();
   assert(pModule);
