@@ -23,6 +23,72 @@ any SysYIRGenerator::visitCond(SysYParser::CondContext* ctx)
 	return visitLOrExp(ctx->lOrExp());
 }
 
+std::any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx)
+{
+	if (ctx->lVal() != nullptr) {
+		// visitLVal here
+	} else if (ctx->Return() != nullptr) {
+		Value *value = nullptr;
+		if (ctx->exp() != nullptr)
+			value = any_cast<Value *>(visitExp(ctx->exp()));
+		return builder.createReturnInst(value);
+	} else if (ctx->If() != nullptr) {
+		auto *cond = any_cast<Value *>(visitCond(ctx->cond()));
+		auto *block = builder.getBasicBlock();
+		auto *func = block->getParent();
+
+		// translate thenblock
+		auto *thenBlock = func->addBasicBlock();
+		block->getSuccessors().push_back(thenBlock);
+		thenBlock->getPredecessors().push_back(block);
+		builder.setPosition(thenBlock, thenBlock->end());
+		visitStmt(ctx->stmt()[0]);
+		builder.setPosition(block, block->end());
+
+		// translate elseblock
+		BasicBlock *elseBlock = nullptr;
+		if (ctx->Else() != nullptr) {
+			elseBlock = func->addBasicBlock();
+			block->getSuccessors().push_back(elseBlock);
+			elseBlock->getPredecessors().push_back(block);
+			builder.setPosition(thenBlock, elseBlock->end());
+			visitStmt(ctx->stmt()[1]);
+			builder.setPosition(block, elseBlock->end());
+		}
+
+		std::vector<Value *> thenArgs, elseArgs;   ///< then/else块的实参列表，暂时用不上，留空即可
+		builder.createCondBrInst(cond, thenBlock, elseBlock, thenArgs, elseArgs);
+
+		// translate following block
+		auto *followingBlock = func->addBasicBlock();
+		block->getSuccessors().push_back(followingBlock);
+		followingBlock->getPredecessors().push_back(block);
+		builder.setPosition(followingBlock, followingBlock->end());
+	} else if (ctx->While() != nullptr) {
+		auto *cond = any_cast<Value *>(visitCond(ctx->cond()));
+		auto *block = builder.getBasicBlock();
+		auto *func = block->getParent();
+		
+		// translate inner block
+		auto *innerBlock = func->addBasicBlock();
+		block->getSuccessors().push_back(innerBlock);
+		innerBlock->getPredecessors().push_back(block);
+		builder.setPosition(innerBlock, innerBlock->end());
+		visitStmt(ctx->stmt()[0]);
+		builder.setPosition(block, block->end());
+
+		std::vector<Value *> innerArgs;
+		builder.createCondBrInst(cond, innerBlock, nullptr, innerArgs, std::vector<Value *>());
+
+		// translate following block
+		auto *followingBlock = func->addBasicBlock();
+		block->getSuccessors().push_back(followingBlock);
+		followingBlock->getPredecessors().push_back(block);
+		builder.setPosition(followingBlock, followingBlock->end());
+	}
+	return nullptr;
+}
+
 any SysYIRGenerator::visitLOrExp(SysYParser::LOrExpContext* ctx)
 {
 	auto *child = ctx->children[0];
@@ -360,6 +426,7 @@ any SysYIRGenerator::visitNumber(SysYParser::NumberContext *ctx)
 	}
 	return nullptr;
 }
+
 /*any SysYIRGenerator::visitModule(SysYParser::ModuleContext *ctx) {
   auto pModule = new Module();
   assert(pModule);

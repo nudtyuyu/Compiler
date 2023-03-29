@@ -44,7 +44,7 @@ public:
   virtual std::any visitLAndExp(SysYParser::LAndExpContext *ctx) override;
   virtual std::any visitLOrExp(SysYParser::LOrExpContext *ctx) override;
   virtual std::any visitCond(SysYParser::CondContext *ctx) override;
-  //virtual std::any visitStmt(SysYParser::StmtContext *ctx) override;
+  virtual std::any visitStmt(SysYParser::StmtContext *ctx) override;
   //virtual std::any visitBlockItem(SysYParser::BlockItemContext *ctx) override;
   //virtual std::any visitBlock(SysYParser::BlockContext *ctx) override;
   //virtual std::any visitFuncDef(SysYParser::FuncDefContext *ctx) override;
