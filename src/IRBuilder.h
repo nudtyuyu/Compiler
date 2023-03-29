@@ -219,6 +219,15 @@ public:
     block->getInstructions().emplace(position, inst);
     return inst;
   }
+  CallInst *createCallInst(Function *callee,
+                           const std::vector<Value *> args = {},
+                           BasicBlock *parent = nullptr,
+                           const std::string &name = "") {
+    auto inst = new CallInst(callee, args, parent, name);
+    assert(inst);
+    block->getInstructions().emplace(position, inst);
+    return inst;
+  }
 };
 
 } // namespace sysy
