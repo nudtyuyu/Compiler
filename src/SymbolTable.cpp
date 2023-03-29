@@ -42,7 +42,7 @@ void SymbolTable::view() const {
         std::cout << "\n+---------------+---------------+\n";
         std::cout << std::right;
         std::cout << "|" << std::setw(15) << "Name"
-                  << "|" << std::setw(15) << "Address"
+                  << "|" << std::setw(15) << "Pointer"
                   << "|\n";
         std::cout << "+---------------+---------------+\n";
         for (auto &pair : *pSubTable) {
