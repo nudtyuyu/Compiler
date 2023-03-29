@@ -38,7 +38,7 @@ public:
 //     return visitChildren(ctx);
 //   }
 
-  virtual std::any visitBtype(SysYParser::BtypeContext *ctx) override {
+  /*virtual std::any visitBtype(SysYParser::BtypeContext *ctx) override {
     os << ctx->getText();
     return 0;
   }
@@ -332,7 +332,7 @@ public:
   visitFuncRParams(SysYParser::FuncRParamsContext *ctx) override {
     interleave(ctx->exp(), ", ");
     return 0;
-  }
+  }*/
 };
 
 } // namespace sysy

@@ -17,7 +17,38 @@ public:
   SysYIRGenerator() = default;
 
 public:
-  virtual std::any visitModule(SysYParser::ModuleContext *ctx) override;
+  virtual std::any visitCompUnit(SysYParser::CompUnitContext *ctx) override;
+  virtual std::any visitNumber(SysYParser::NumberContext *ctx) override;
+  //virtual std::any visitString(SysYParser::StringContext *ctx) override;
+  virtual std::any visitLVal(SysYParser::LValContext *ctx) override;
+  virtual std::any visitPrimaryExp(SysYParser::PrimaryExpContext *ctx) override;
+  //virtual std::any visitUnaryOp(SysYParser::UnaryOpContext *ctx) override;
+  virtual std::any visitUnaryExp(SysYParser::UnaryExpContext *ctx) override;
+  virtual std::any visitExp(SysYParser::ExpContext *ctx) override;
+  virtual std::any visitAddExp(SysYParser::AddExpContext *ctx) override;
+  virtual std::any visitMulExp(SysYParser::MulExpContext *ctx) override;
+  //virtual std::any visitFuncFParams(SysYParser::FuncFParamsContext *ctx) override;
+  //virtual std::any visitFuncFParam(SysYParser::FuncFParamContext *ctx) override;
+  //virtual std::any visitBType(SysYParser::BTypeContext *ctx) override;
+  //virtual std::any visitFuncType(SysYParser::FuncTypeContext *ctx) override;
+  virtual std::any visitConstExp(SysYParser::ConstExpContext *ctx) override;
+  //virtual std::any visitConstInitVal(SysYParser::ConstInitValContext *ctx) override;
+  //virtual std::any visitConstDef(SysYParser::ConstDefContext *ctx) override;
+  //virtual std::any visitInitVal(SysYParser::InitValContext *ctx) override;
+  //virtual std::any visitVarDef(SysYParser::VarDefContext *ctx) override;
+  //virtual std::any visitVarDecl(SysYParser::VarDeclContext *ctx) override;
+  //virtual std::any visitConstDecl(SysYParser::ConstDeclContext *ctx) override;
+  //virtual std::any visitDecl(SysYParser::DeclContext *ctx) override;
+  virtual std::any visitRelExp(SysYParser::RelExpContext *ctx) override;
+  virtual std::any visitEqExp(SysYParser::EqExpContext *ctx) override;
+  virtual std::any visitLAndExp(SysYParser::LAndExpContext *ctx) override;
+  virtual std::any visitLOrExp(SysYParser::LOrExpContext *ctx) override;
+  virtual std::any visitCond(SysYParser::CondContext *ctx) override;
+  //virtual std::any visitStmt(SysYParser::StmtContext *ctx) override;
+  //virtual std::any visitBlockItem(SysYParser::BlockItemContext *ctx) override;
+  //virtual std::any visitBlock(SysYParser::BlockContext *ctx) override;
+  //virtual std::any visitFuncDef(SysYParser::FuncDefContext *ctx) override;
+  /*virtual std::any visitModule(SysYParser::ModuleContext *ctx) override;
 
   virtual std::any visitDecl(SysYParser::DeclContext *ctx) override;
 
@@ -166,7 +197,7 @@ public:
   virtual std::any
   visitFuncRParams(SysYParser::FuncRParamsContext *ctx) override {
     return visitChildren(ctx);
-  }
+  }*/
 
 }; // class SysYIRGenerator
 

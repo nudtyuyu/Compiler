@@ -1,12 +1,366 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#include <cstdio>
 using namespace std;
 #include "SysYIRGenerator.h"
 
 namespace sysy {
 
-any SysYIRGenerator::visitModule(SysYParser::ModuleContext *ctx) {
+any SysYIRGenerator::visitCompUnit(SysYParser::CompUnitContext *ctx)
+{
+	cout<<"visitCompUnit"<<endl;
+	return 0;
+}
+
+any SysYIRGenerator::visitConstExp(SysYParser::ConstExpContext *ctx)
+{
+	return visitAddExp(ctx->addExp());
+}
+
+any SysYIRGenerator::visitCond(SysYParser::CondContext* ctx)
+{
+	return visitLOrExp(ctx->lOrExp());
+}
+
+any SysYIRGenerator::visitLOrExp(SysYParser::LOrExpContext* ctx)
+{
+	auto *child = ctx->children[0];
+	auto *And_child = dynamic_cast<SysYParser::LAndExpContext *>(child);
+	auto *Or_child = dynamic_cast<SysYParser::LOrExpContext *>(child);
+	if(And_child != nullptr)
+	{
+		return visitLAndExp(ctx->lAndExp());//waiting 
+	}
+	else if(Or_child !=nullptr)
+	{
+		Value* andterm = any_cast<Value *>(visitLAndExp(ctx->lAndExp()));
+		Value* orterm = any_cast<Value *>(visitLOrExp(ctx->lOrExp()));
+		//return builder.create... undefine,waiting
+	}
+	return nullptr;
+}
+
+any SysYIRGenerator::visitLAndExp(SysYParser::LAndExpContext* ctx)
+{
+	auto *child = ctx->children[0];
+	auto *And_child = dynamic_cast<SysYParser::LAndExpContext *>(child);
+	auto *Eq_child = dynamic_cast<SysYParser::EqExpContext *>(child);
+	if(Eq_child != nullptr)
+	{
+		return visitEqExp(ctx->eqExp());//waiting 
+	}
+	else if(And_child !=nullptr)
+	{
+		Value* andterm = any_cast<Value *>(visitLAndExp(ctx->lAndExp()));
+		Value* eqterm = any_cast<Value *>(visitEqExp(ctx->eqExp()));
+		// return builder.create... undefine,waiting
+		//return ....
+	}
+	return nullptr;
+}
+
+any SysYIRGenerator::visitEqExp(SysYParser::EqExpContext* ctx)
+{
+	auto *child = ctx->children[0];
+	auto *Eq_child = dynamic_cast<SysYParser::EqExpContext *>(child);
+	auto *Rel_child = dynamic_cast<SysYParser::RelExpContext *>(child);
+	if(Rel_child != nullptr)
+	{
+		return visitRelExp(ctx->relExp());//waiting 
+	}
+	else if(Eq_child !=nullptr)
+	{
+		Value* eqterm = any_cast<Value *>(visitEqExp(ctx->eqExp()));
+		Value* relterm = any_cast<Value *>(visitRelExp(ctx->relExp()));
+		//lor = builder.create... undefine,waiting
+		if(ctx->Equal())
+		{
+			return builder.createICmpEQInst(eqterm,relterm);
+		}
+		else if(ctx->NonEqual())
+		{
+			return builder.createICmpNEInst(eqterm,relterm);
+		}
+			
+	}
+	return nullptr;
+}
+
+
+any SysYIRGenerator::visitRelExp(SysYParser::RelExpContext* ctx)
+{
+	auto *child = ctx->children[0];
+	auto *Add_child = dynamic_cast<SysYParser::AddExpContext *>(child);
+	auto *Rel_child = dynamic_cast<SysYParser::RelExpContext *>(child);
+	if(Add_child != nullptr)
+	{
+		return visitAddExp(ctx->addExp());//waiting 
+	}
+	else if(Rel_child !=nullptr)
+	{
+		Value* addterm = any_cast<Value *>(visitAddExp(ctx->addExp()));
+		Value* relterm = any_cast<Value *>(visitRelExp(ctx->relExp()));
+		//lor = builder.create... undefine,waiting
+		if(ctx->LessThan())
+		{
+			return builder.createICmpLTInst(relterm,addterm);
+		}
+		else if(ctx->GreaterThan())
+		{
+			return builder.createICmpGTInst(relterm,addterm);
+		}
+		else if(ctx->LessEqual())
+		{
+			return builder.createICmpLEInst(relterm,addterm);
+		}
+		else if(ctx->GreaterEqual())
+		{
+			return builder.createICmpGEInst(relterm,addterm);
+		}
+			
+	}
+	return nullptr;
+}
+
+
+
+any SysYIRGenerator::visitExp(SysYParser::ExpContext *ctx)
+{
+	cout<<"visitExp"<<endl;
+	return visitAddExp(ctx->addExp());
+}
+
+any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
+{
+	auto *child = ctx->children[0];
+	auto *Mul_child = dynamic_cast<SysYParser::MulExpContext *>(child);
+	auto *Add_child = dynamic_cast<SysYParser::AddExpContext *>(child);
+	//auto add;
+	cout<<"visitAddExp"<<endl;
+	if(Mul_child != nullptr)
+	{
+		auto mul = visitMulExp(ctx->mulExp());
+		cout<<"getaddmul"<<endl;
+		return mul;
+	}
+	else if(Add_child != nullptr)
+	{
+		//type transfer
+		Value* addterm = any_cast<Value *>(visitAddExp(ctx->addExp()));
+		cout<<"visitadd:getaddterm"<<endl;
+		Value* multerm = any_cast<Value *>(visitMulExp(ctx->mulExp())); //wait
+		cout<<"visitadd:getmulterm"<<endl;
+		if(addterm)
+		{
+			cout<<"I have valid addterm"<<endl;
+		}
+		if(multerm)
+		{
+			cout<<"I have valid multerm"<<endl;
+		}
+		if(addterm->isInt() && multerm->isInt())
+		{
+			if(ctx->Add())
+			{
+				cout<<"getadd"<<endl;
+				auto add = builder.createAddInst(addterm, multerm); //name????
+			
+				return add;
+			}
+			else if(ctx->Sub())
+			{
+				auto sub = builder.createSubInst(addterm, multerm); //name????
+				cout<<"getsub"<<endl;
+				return sub;
+			}
+		}
+		else if(addterm->isFloat() && multerm->isInt())
+		{
+			cout<<"float!"<<endl;
+			builder.createIToFInst(addterm);
+			if(ctx->Add())
+			{
+				cout<<"getfloatadd"<<endl;
+				auto add = builder.createFAddInst(addterm, multerm); //name????
+				return add;
+			}
+			else if(ctx->Sub())
+			{
+				auto sub = builder.createFSubInst(addterm, multerm); //name????
+				cout<<"getfloatsub"<<endl;
+				return sub;
+			}
+		}
+		else if(addterm->isInt() && multerm->isFloat())
+		{
+			cout<<"float!"<<endl;
+			auto newmul = (Value *)builder.createIToFInst(multerm);
+			if(ctx->Add())
+			{
+				cout<<"getfloatadd"<<endl;
+				auto add = builder.createFAddInst(addterm, multerm); //name????
+			
+				return add;
+			}
+			else if(ctx->Sub())
+			{
+				auto sub = builder.createFSubInst(addterm, multerm); //name????
+				cout<<"getfloatsub"<<endl;
+				return sub;
+			}
+		}
+		
+	}
+	return nullptr;
+}
+any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
+{
+	auto *child = ctx->children[0];
+	auto *Mul_child = dynamic_cast<SysYParser::MulExpContext *>(child);
+	auto *Unary_child = dynamic_cast<SysYParser::UnaryExpContext *>(child);
+	//auto mul;
+	cout<<"visitMulExp"<<endl;
+	if(Unary_child != nullptr)
+	{
+		auto unary = visitUnaryExp(ctx->unaryExp());
+		cout<<"getmulunary"<<endl;
+		return unary;
+	}
+	else if(Mul_child !=nullptr)
+	{
+		Value* unaryterm = any_cast<Value *>(visitUnaryExp(ctx->unaryExp()));
+		Value* multerm = any_cast<Value *>(visitMulExp(ctx->mulExp()));
+		// Type tansfer
+		if(ctx->Mul())
+		{
+			auto mul = builder.createMulInst(multerm,unaryterm);
+			cout<<"getmul"<<endl;
+			return mul;
+		}
+		else if(ctx->Div())
+		{
+			auto div = builder.createDivInst(multerm,unaryterm);
+			cout<<"getdiv"<<endl;
+			return div;
+		}
+		else if(ctx->Mod())
+		{
+			
+			auto mod = builder.createRemInst(multerm,unaryterm);
+			cout<<"getmod"<<endl;
+			return mod;
+		}
+		
+	}
+	return nullptr;
+	
+}
+
+any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
+{
+	auto *child = ctx->children[0];
+	auto *Primary_child = dynamic_cast<SysYParser::PrimaryExpContext *>(child);
+	auto *UnaryOp_child = dynamic_cast<SysYParser::UnaryExpContext *>(child);
+	cout<<"visitUnaryExp"<<endl;
+	if(Primary_child != nullptr)
+	{
+		return visitPrimaryExp(ctx->primaryExp());
+	}
+	else if(ctx->Identifier())
+	{
+		/*auto callee = any_cast<Function *>(ctx->Identifier()->getText());
+		vector <Value*> args;
+		auto params = ctx->funcRParams()->exp();
+		for(auto param:params)
+		{
+			args.push_back(any_cast<Value *>(param));
+		}*/
+		//unary = builder.create
+		cout<<"function calling!"<<endl;
+		
+	} //identifier table!!!
+	else if(UnaryOp_child != nullptr)
+	{
+		Value* term = any_cast<Value *>(visitUnaryExp(ctx->unaryExp()));
+		if(ctx->unaryOp()->Add())
+		{
+			
+			//create
+			cout<<"PositiveUnary: wait for edit!"<<endl;
+		}
+		else if(ctx->unaryOp()->Sub())
+		{
+			// Type! Int or Float!
+			auto unary = builder.createNegInst(term);
+			cout<<"getunarysub"<<endl;
+			return unary;
+		}
+		else if(ctx->unaryOp()->Not())
+		{
+			// Type! Int or Float!
+			auto unary = builder.createNotInst(term);
+			cout<<"getunarynot"<<endl;
+			return unary;
+		}
+		
+	}
+	return nullptr;
+}
+
+any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
+{
+	cout<<"visitPrimaryExp"<<endl;
+	if(ctx->LeftBracket())
+	{
+		return visitExp(ctx->exp());
+	}
+	else if(ctx->lVal())
+	{
+		//return visitLVal(ctx->lVal());//waiting
+		cout<<"This is LVal, waiting to edit"<<endl;
+	}
+	else if(ctx->number())
+	{
+		auto num = visitNumber(ctx->number());//waiting
+		cout<<"getnum"<<endl;
+		return num;
+	}
+	return nullptr;
+	
+}
+
+any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx)
+{
+	auto name = ctx->Identifier()->getText();
+  	auto exps = ctx->exp();
+  	// notation table! name,dim,leftvalue,......hard!!!
+  	return 0;
+	
+}
+
+any SysYIRGenerator::visitNumber(SysYParser::NumberContext *ctx)
+{
+	cout<<"visitNumber"<<endl;
+	//return ctx->IntConst() ? Type::getInt() : Type::getFloat();
+	if(ctx->IntConst())
+	{
+		//return module->createGlobalValue(ctx->IntConst()->getText(),Type::getIntType());	
+		//return ctx->IntConst();
+		int value = atoi(ctx->IntConst()->getText().c_str());
+		return (Value*)ConstantValue::get(value);
+			
+	}
+	else if(ctx->FloatConst())
+	{
+		//return module->createGlobalValue(ctx->FloatConst()->getText(),Type::getFloatType());
+		//return ctx->FloatConst();
+		float value = atof(ctx->FloatConst()->getText().c_str());
+		return (Value*)ConstantValue::get(value);		
+	}
+	return nullptr;
+}
+/*any SysYIRGenerator::visitModule(SysYParser::ModuleContext *ctx) {
   auto pModule = new Module();
   assert(pModule);
   module.reset(pModule);
@@ -60,6 +414,6 @@ any SysYIRGenerator::visitDecl(SysYParser::DeclContext *ctx) {
     values.push_back(alloca);
   }
   return values;
-}
+}*/
 
 } // namespace sysy

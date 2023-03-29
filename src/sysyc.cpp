@@ -1,4 +1,4 @@
-#include "ASTPrinter.h"
+//#include "ASTPrinter.h"
 #include "tree/ParseTreeWalker.h"
 #include <cstdlib>
 #include <fstream>
@@ -25,10 +25,14 @@ int main(int argc, char **argv) {
   SysYLexer lexer(&input);
   CommonTokenStream tokens(&lexer);
   SysYParser parser(&tokens);
-  auto module = parser.module();
+  //auto module = parser.module();
+  //auto compile = parser.compUnit();
+  auto exp = parser.exp();
 
   SysYIRGenerator generator;
-  generator.visitModule(module);
+  //generator.visitModule();
+  //generator.visitCompUnit(compile);
+  auto IR = generator.visitExp(exp);
 
   return EXIT_SUCCESS;
 }
