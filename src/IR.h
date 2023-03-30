@@ -350,6 +350,8 @@ public:
     kMul = 0x1UL << 2,
     kDiv = 0x1UL << 3,
     kRem = 0x1UL << 4,
+    kAnd = 0x1UL <<39,
+    kOr  = 0x1UL <<40,
     kICmpEQ = 0x1UL << 5,
     kICmpNE = 0x1UL << 6,
     kICmpLT = 0x1UL << 7,
@@ -368,8 +370,10 @@ public:
     kFCmpLE = 0x1UL << 23,
     kFCmpGE = 0x1UL << 24,
     // Unary
+    kPos = 0x1UL << 37,
     kNeg = 0x1UL << 25,
     kNot = 0x1UL << 26,
+    kFPos = 0x1UL <<38,
     kFNeg = 0x1UL << 26,
     kFtoI = 0x1UL << 28,
     kIToF = 0x1UL << 29,
@@ -404,13 +408,14 @@ public:
   bool isBinary() const {
     static constexpr uint64_t BinaryOpMask =
         (kAdd | kSub | kMul | kDiv | kRem) |
+        (kAnd | kOr) |
         (kICmpEQ | kICmpNE | kICmpLT | kICmpGT | kICmpLE | kICmpGE) |
         (kFAdd | kFSub | kFMul | kFDiv | kFRem) |
         (kFCmpEQ | kFCmpNE | kFCmpLT | kFCmpGT | kFCmpLE | kFCmpGE);
     return kind & BinaryOpMask;
   }
   bool isUnary() const {
-    static constexpr uint64_t UnaryOpMask = kNeg | kNot | kFNeg | kFtoI | kIToF;
+    static constexpr uint64_t UnaryOpMask = kPos | kNeg | kNot | kFPos| kFNeg | kFtoI | kIToF;
     return kind & UnaryOpMask;
   }
   bool isMemory() const {
@@ -433,7 +438,7 @@ public:
   }
   bool isCommutative() const {
     static constexpr uint64_t CommutativeOpMask =
-        kAdd | kMul | kICmpEQ | kICmpNE | kFAdd | kFMul | kFCmpEQ | kFCmpNE;
+        kAnd | kOr | kAdd | kMul | kICmpEQ | kICmpNE | kFAdd | kFMul | kFCmpEQ | kFCmpNE;
     return kind & CommutativeOpMask;
   }
   bool isUnconditional() const { return kind == kBr; }

@@ -35,6 +35,10 @@ public:
     block->getInstructions().emplace(position, inst);
     return inst;
   }
+  UnaryInst *createPosInst(Value *operand, const std::string &name = "") {
+    return createUnaryInst(Instruction::kPos, Type::getIntType(), operand,
+                           name);
+  }
   UnaryInst *createNegInst(Value *operand, const std::string &name = "") {
     return createUnaryInst(Instruction::kNeg, Type::getIntType(), operand,
                            name);
@@ -45,6 +49,10 @@ public:
   }
   UnaryInst *createFtoIInst(Value *operand, const std::string &name = "") {
     return createUnaryInst(Instruction::kFtoI, Type::getIntType(), operand,
+                           name);
+  }
+  UnaryInst *createFPosInst(Value *operand, const std::string &name = "") {
+    return createUnaryInst(Instruction::kFPos, Type::getFloatType(), operand,
                            name);
   }
   UnaryInst *createFNegInst(Value *operand, const std::string &name = "") {
@@ -61,6 +69,16 @@ public:
     assert(inst);
     block->getInstructions().emplace(position, inst);
     return inst;
+  }
+  BinaryInst *createAndInst(Value *lhs, Value *rhs,
+                            const std::string &name = "") {
+    return createBinaryInst(Instruction::kAnd, Type::getIntType(), lhs, rhs,
+                            name);
+  }
+  BinaryInst *createOrInst(Value *lhs, Value *rhs,
+                            const std::string &name = "") {
+    return createBinaryInst(Instruction::kOr, Type::getIntType(), lhs, rhs,
+                            name);
   }
   BinaryInst *createAddInst(Value *lhs, Value *rhs,
                             const std::string &name = "") {

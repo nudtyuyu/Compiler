@@ -103,6 +103,8 @@ any SysYIRGenerator::visitLOrExp(SysYParser::LOrExpContext* ctx)
 		Value* andterm = any_cast<Value *>(visitLAndExp(ctx->lAndExp()));
 		Value* orterm = any_cast<Value *>(visitLOrExp(ctx->lOrExp()));
 		//return builder.create... undefine,waiting
+		auto lor = builder.createOrInst(andterm,orterm);
+		return lor;
 	}
 	return nullptr;
 }
@@ -122,6 +124,8 @@ any SysYIRGenerator::visitLAndExp(SysYParser::LAndExpContext* ctx)
 		Value* eqterm = any_cast<Value *>(visitEqExp(ctx->eqExp()));
 		// return builder.create... undefine,waiting
 		//return ....
+		auto land = builder.createAndInst(andterm,eqterm);
+		return land;
 	}
 	return nullptr;
 }
@@ -526,15 +530,22 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 	}
 	else if(ctx->Identifier())
 	{
-		/*auto callee = any_cast<Function *>(ctx->Identifier()->getText());
+		cout<<"function calling!"<<endl;
+		auto callee = module->getFunction(ctx->Identifier()->getText());
 		vector <Value*> args;
 		auto params = ctx->funcRParams()->exp();
+		auto entry = callee->getEntryBlock();
+		auto parent = entry->getParent();
+		cout<<"entry yes!"<<endl;
+		//auto parent = BasicBlock::getParent();
 		for(auto param:params)
 		{
-			args.push_back(any_cast<Value *>(param));
-		}*/
-		//unary = builder.create
-		cout<<"function calling!"<<endl;
+			cout<<"param"<<endl;
+			args.push_back(any_cast<Value *>(visitExp(param)));
+		}
+		
+		builder.createCallInst(callee,args,entry);
+		
 		
 	} //identifier table!!!
 	else if(UnaryOp_child != nullptr)
@@ -546,7 +557,9 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 			{
 			
 				//create
+				auto unary = builder.createPosInst(term);
 				cout<<"PositiveUnary: wait for edit!"<<endl;
+				return unary;
 			}
 			else if(ctx->unaryOp()->Sub())
 			{
@@ -569,7 +582,9 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 			{
 			
 				//create
+				auto unary = builder.createFPosInst(term);
 				cout<<"PositiveUnary: wait for edit!"<<endl;
+				return unary;
 			}
 			else if(ctx->unaryOp()->Sub())
 			{
