@@ -33,12 +33,15 @@ std::any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx)
 			value = any_cast<Value *>(visitExp(ctx->exp()));
 		return builder.createReturnInst(value);
 	} else if (ctx->If() != nullptr) {
+		auto *block = builder.getBasicBlock();				///< 当前所在基本块
+		auto *func = block->getParent();					///< 当前所在函数
+		auto *thenBlock = func->addBasicBlock();			///< then分支基本块
+		BasicBlock *elseBlock = nullptr;					///< else分支基本块（可能没有）
+		auto *exitBlock = func->addBasicBlock();			///< if-then-else结束后的部分
+		std::vector<Value *> thenArgs, elseArgs;   			///< then/else基本块的实参列表，暂时用不上，留空即可
 		auto *cond = any_cast<Value *>(visitCond(ctx->cond()));
-		auto *block = builder.getBasicBlock();
-		auto *func = block->getParent();
 
 		// translate thenblock
-		auto *thenBlock = func->addBasicBlock();
 		block->getSuccessors().push_back(thenBlock);
 		thenBlock->getPredecessors().push_back(block);
 		builder.setPosition(thenBlock, thenBlock->end());
@@ -46,7 +49,6 @@ std::any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx)
 		builder.setPosition(block, block->end());
 
 		// translate elseblock
-		BasicBlock *elseBlock = nullptr;
 		if (ctx->Else() != nullptr) {
 			elseBlock = func->addBasicBlock();
 			block->getSuccessors().push_back(elseBlock);
@@ -56,35 +58,52 @@ std::any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx)
 			builder.setPosition(block, elseBlock->end());
 		}
 
-		std::vector<Value *> thenArgs, elseArgs;   ///< then/else块的实参列表，暂时用不上，留空即可
 		builder.createCondBrInst(cond, thenBlock, elseBlock, thenArgs, elseArgs);
 
-		// translate following block
-		auto *followingBlock = func->addBasicBlock();
-		block->getSuccessors().push_back(followingBlock);
-		followingBlock->getPredecessors().push_back(block);
-		builder.setPosition(followingBlock, followingBlock->end());
+		// translate exitblock
+		block->getSuccessors().push_back(exitBlock);
+		exitBlock->getPredecessors().push_back(block);
+		builder.setPosition(exitBlock, exitBlock->end());
 	} else if (ctx->While() != nullptr) {
+		auto *block = builder.getBasicBlock();			///< 当前所在基本块
+		auto *func = block->getParent();				///< 当前所在函数
+		auto *entryBlock = func->addBasicBlock();		///< 循环入口，即循环条件计算和判断
+		auto *innerBlock = func->addBasicBlock();		///< while循环体块
+		auto *exitBlock = func->addBasicBlock();		///< while循环结束后的部分
+		std::vector<Value *> innerArgs;					///< 循环体块实参列表，暂时留空
+
+		block->getSuccessors().push_back(entryBlock);
+		entryBlock->getPredecessors().push_back(block);
+		entryBlock->getSuccessors().push_back(innerBlock);
+		innerBlock->getPredecessors().push_back(entryBlock);
+		entryBlock->getSuccessors().push_back(exitBlock);
+		exitBlock->getPredecessors().push_back(entryBlock);
+
+		// translate cond/entry block
+		builder.setPosition(entryBlock, entryBlock->end());
 		auto *cond = any_cast<Value *>(visitCond(ctx->cond()));
-		auto *block = builder.getBasicBlock();
-		auto *func = block->getParent();
+		builder.createCondBrInst(cond, innerBlock, nullptr, innerArgs, std::vector<Value *>());
 		
 		// translate inner block
-		auto *innerBlock = func->addBasicBlock();
-		block->getSuccessors().push_back(innerBlock);
-		innerBlock->getPredecessors().push_back(block);
 		builder.setPosition(innerBlock, innerBlock->end());
+		loopEntry.push_back(entryBlock);
+		loopExit.push_back(exitBlock);
 		visitStmt(ctx->stmt()[0]);
-		builder.setPosition(block, block->end());
+		loopEntry.pop_back();
+		loopExit.pop_back();
 
-		std::vector<Value *> innerArgs;
-		builder.createCondBrInst(cond, innerBlock, nullptr, innerArgs, std::vector<Value *>());
-
-		// translate following block
-		auto *followingBlock = func->addBasicBlock();
-		block->getSuccessors().push_back(followingBlock);
-		followingBlock->getPredecessors().push_back(block);
-		builder.setPosition(followingBlock, followingBlock->end());
+		// translate exitblock
+		builder.setPosition(exitBlock, exitBlock->end());
+	} else if (ctx->Break()) {
+		std::vector<Value *> args;		///< 留空
+		builder.createUncondBrInst(loopExit.back(), args);
+	} else if (ctx->Continue()) {
+		std::vector<Value *> args;		///< 留空
+		builder.createUncondBrInst(loopEntry.back(), args);
+	} else if (ctx->block()) {
+		visitBlock(ctx->block());
+	} else if (ctx->exp()) {
+		visitExp(ctx->exp());
 	}
 	return nullptr;
 }

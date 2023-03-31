@@ -13,6 +13,10 @@ private:
   std::unique_ptr<Module> module;
   IRBuilder builder;
 
+  /// 循环嵌套记录，用于Break，Continue的翻译
+  std::vector<BasicBlock *> loopEntry;
+  std::vector<BasicBlock *> loopExit;
+
 public:
   SysYIRGenerator() = default;
 
