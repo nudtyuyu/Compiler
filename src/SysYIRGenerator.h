@@ -13,10 +13,6 @@ private:
   std::unique_ptr<Module> module;
   IRBuilder builder;
 
-  /// 循环嵌套记录，用于Break，Continue的翻译
-  std::vector<BasicBlock *> loopEntry;
-  std::vector<BasicBlock *> loopExit;
-
 public:
   SysYIRGenerator() = default;
 
@@ -33,16 +29,16 @@ public:
   virtual std::any visitMulExp(SysYParser::MulExpContext *ctx) override;
   //virtual std::any visitFuncFParams(SysYParser::FuncFParamsContext *ctx) override;
   //virtual std::any visitFuncFParam(SysYParser::FuncFParamContext *ctx) override;
-  //virtual std::any visitBType(SysYParser::BTypeContext *ctx) override;
+  virtual std::any visitBType(SysYParser::BTypeContext *ctx) override;
   //virtual std::any visitFuncType(SysYParser::FuncTypeContext *ctx) override;
   virtual std::any visitConstExp(SysYParser::ConstExpContext *ctx) override;
-  //virtual std::any visitConstInitVal(SysYParser::ConstInitValContext *ctx) override;
+  virtual std::any visitConstInitVal(SysYParser::ConstInitValContext *ctx) override;
   //virtual std::any visitConstDef(SysYParser::ConstDefContext *ctx) override;
-  //virtual std::any visitInitVal(SysYParser::InitValContext *ctx) override;
+  virtual std::any visitInitVal(SysYParser::InitValContext *ctx) override;
   //virtual std::any visitVarDef(SysYParser::VarDefContext *ctx) override;
-  //virtual std::any visitVarDecl(SysYParser::VarDeclContext *ctx) override;
-  //virtual std::any visitConstDecl(SysYParser::ConstDeclContext *ctx) override;
-  //virtual std::any visitDecl(SysYParser::DeclContext *ctx) override;
+  virtual std::any visitVarDecl(SysYParser::VarDeclContext *ctx) override;
+  virtual std::any visitConstDecl(SysYParser::ConstDeclContext *ctx) override;
+  virtual std::any visitDecl(SysYParser::DeclContext *ctx) override;
   virtual std::any visitRelExp(SysYParser::RelExpContext *ctx) override;
   virtual std::any visitEqExp(SysYParser::EqExpContext *ctx) override;
   virtual std::any visitLAndExp(SysYParser::LAndExpContext *ctx) override;

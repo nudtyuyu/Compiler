@@ -10,8 +10,137 @@ namespace sysy {
 any SysYIRGenerator::visitCompUnit(SysYParser::CompUnitContext *ctx)
 {
 	cout<<"visitCompUnit"<<endl;
+	// Decl: createGlobal value
 	return 0;
 }
+
+any SysYIRGenerator::visitDecl(SysYParser::DeclContext *ctx)
+{
+	auto decl = (ctx->constDecl())?visitConstDecl(ctx->constDecl()):visitVarDecl(ctx->varDecl());
+	return decl;
+}
+
+any SysYIRGenerator::visitBType(SysYParser::BTypeContext *ctx)
+{
+	return ctx->Int() ? Type::getIntType() : Type::getFloatType();
+}
+
+any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
+{
+	vector <Value*> values;
+	auto type = any_cast<Type*>(visitBType(ctx->bType()));
+	for(auto constdef:ctx->constDef())
+	{
+		auto name = constdef->Identifier()->getText();
+		vector <Value *> dims;
+		if(constdef->constExp())
+		{
+			for(auto constexp:constdef->constExp())
+			{
+			dims.push_back(any_cast<Value*>(visitConstExp(constexp)));
+			}
+			auto alloca = builder.createAllocaInst(type,dims,name);
+			if(constdef->Assign())
+			{
+				auto value = any_cast<Value*>(visitConstInitVal(constdef->constInitVal()));
+				//Init List???
+				//auto store = builder.createStoreInst(value,alloca);
+			}
+			
+		}
+		else
+		{
+			auto alloca = builder.createAllocaInst(type,{},name);
+			if(constdef->Assign())
+			{
+				auto value = any_cast<Value*>(visitConstInitVal(constdef->constInitVal()));
+				auto store = builder.createStoreInst(value,alloca);
+			}
+			else
+			{
+				if(type->isInt())
+				{
+					int a = 0;
+					Value* value = (Value*)ConstantValue::get(a)
+					auto store = builder.createStoreInst(value,alloca);
+				}
+				else if(type->isFloat())
+				{
+					float a = 0.0;
+					Value* value = (Value*)ConstantValue::get(a)
+					auto store = builder.createStoreInst(value,alloca);
+				}
+			
+			}
+			values.push_back(alloca);
+		}
+	}
+	return values;
+}
+
+any SysYIRGenerator::visitConstInitVal(SysYParser::ConstInitValContext *ctx)
+{
+	if(ctx->constExp())
+	{
+		auto constexp = visitConstExp(ctx->constExp());
+		return constexp;
+	}
+	else
+	{
+		vector <Value*> values;
+		for(auto constinit:ctx->constInitVal())
+		{
+			values.push_back(any_cast<Value*>(visitConstInitVal(constinit)));
+		}
+		return values;
+	}
+	return nullptr;
+}
+
+
+any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
+{
+	vector <Value*> values;
+	auto type = any_cast<Type*>(visitBType(ctx->bType()));
+	for(auto vardef:ctx->varDef())
+	{
+		auto name = vardef->Identifier()->getText();
+		vector <Value *> dims;
+		for(auto constexp:vardef->constExp())
+		{
+			dims.push_back(any_cast<Value*>(visitConstExp(constexp)));
+		}
+		auto alloca = builder.createAllocaInst(type,dims,name);
+		if(vardef->Assign())
+		{
+			auto value = any_cast<Value*>(visitInitVal(vardef->initVal()));
+			auto store = builder.createStoreInst(value,alloca);
+		}
+		values.push_back(alloca);
+	}
+	return values;
+}
+
+any SysYIRGenerator::visitInitVal(SysYParser::InitValContext *ctx)
+{
+	if(ctx->exp())
+	{
+		auto constexp = visitExp(ctx->exp());
+		return constexp;
+	}
+	else
+	{
+		vector <Value*> values;
+		for(auto initv:ctx->initVal())
+		{
+			values.push_back(any_cast<Value*>(visitInitVal(initv)));
+		}
+		return values;
+	}
+	return nullptr;
+}
+
+
 
 any SysYIRGenerator::visitConstExp(SysYParser::ConstExpContext *ctx)
 {
