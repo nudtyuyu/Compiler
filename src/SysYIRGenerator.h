@@ -12,6 +12,8 @@ class SysYIRGenerator : public SysYBaseVisitor {
 private:
   std::unique_ptr<Module> module;
   IRBuilder builder;
+  std::vector<BasicBlock *> loopEntry;
+  std::vector<BasicBlock *> loopExit;
 
 public:
   SysYIRGenerator() = default;

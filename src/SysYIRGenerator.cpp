@@ -11,6 +11,8 @@ any SysYIRGenerator::visitCompUnit(SysYParser::CompUnitContext *ctx)
 {
 	cout<<"visitCompUnit"<<endl;
 	// Decl: createGlobal value
+	for(auto decl:ctx->decl())
+		visitDecl(decl);
 	return 0;
 }
 
@@ -33,7 +35,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 	{
 		auto name = constdef->Identifier()->getText();
 		vector <Value *> dims;
-		if(constdef->constExp())
+		if(!constdef->constExp().empty())
 		{
 			for(auto constexp:constdef->constExp())
 			{
@@ -46,6 +48,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 				//Init List???
 				//auto store = builder.createStoreInst(value,alloca);
 			}
+			values.push_back(alloca);
 			
 		}
 		else
@@ -61,13 +64,13 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 				if(type->isInt())
 				{
 					int a = 0;
-					Value* value = (Value*)ConstantValue::get(a)
+					Value* value = (Value*)ConstantValue::get(a);
 					auto store = builder.createStoreInst(value,alloca);
 				}
 				else if(type->isFloat())
 				{
 					float a = 0.0;
-					Value* value = (Value*)ConstantValue::get(a)
+					Value* value = (Value*)ConstantValue::get(a);
 					auto store = builder.createStoreInst(value,alloca);
 				}
 			
@@ -106,17 +109,49 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 	{
 		auto name = vardef->Identifier()->getText();
 		vector <Value *> dims;
-		for(auto constexp:vardef->constExp())
+		if(!vardef->constExp().empty())
 		{
+			for(auto constexp:vardef->constExp())
+			{
 			dims.push_back(any_cast<Value*>(visitConstExp(constexp)));
+			}
+			auto alloca = builder.createAllocaInst(type,dims,name);
+			if(vardef->Assign())
+			{
+				auto value = any_cast<Value*>(visitInitVal(vardef->initVal()));
+				//Init List???
+				//auto store = builder.createStoreInst(value,alloca);
+			}
+			values.push_back(alloca);
+			
 		}
-		auto alloca = builder.createAllocaInst(type,dims,name);
-		if(vardef->Assign())
+		else
 		{
-			auto value = any_cast<Value*>(visitInitVal(vardef->initVal()));
-			auto store = builder.createStoreInst(value,alloca);
+			auto alloca = builder.createAllocaInst(type,{},name);
+			if(vardef->Assign())
+			{
+				auto value = any_cast<Value*>(visitInitVal(vardef->initVal()));
+				auto store = builder.createStoreInst(value,alloca);
+			}
+			else
+			{
+				if(type->isInt())
+				{
+					int a = 0;
+					Value* value = (Value*)ConstantValue::get(a);
+					auto store = builder.createStoreInst(value,alloca);
+				}
+				else if(type->isFloat())
+				{
+					float a = 0.0;
+					Value* value = (Value*)ConstantValue::get(a);
+					auto store = builder.createStoreInst(value,alloca);
+				}
+			
+			}
+			values.push_back(alloca);
 		}
-		values.push_back(alloca);
+		
 	}
 	return values;
 }
