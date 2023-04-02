@@ -68,7 +68,7 @@ int main() {
     sysy::SymbolTable table;
 
     // 一级符号表（全局）
-    table.newTable();
+    table.newTable(); 
     table.insert("x", (sysy::Value *) 0x1000080);
     table.insert("func", (sysy::Value *) 0x4000068);
 

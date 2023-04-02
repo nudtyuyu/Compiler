@@ -5,6 +5,7 @@
 #include "IRBuilder.h"
 #include "SysYBaseVisitor.h"
 #include "SysYParser.h"
+#include"SymbolTable.h"
 
 namespace sysy {
 
@@ -14,6 +15,12 @@ private:
   IRBuilder builder;
   std::vector<BasicBlock *> loopEntry;
   std::vector<BasicBlock *> loopExit;
+  
+
+public:
+  bool GlobalVal;
+  bool LocalVal;
+  sysy::SymbolTable SymTable;
 
 public:
   SysYIRGenerator() = default;

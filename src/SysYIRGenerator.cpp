@@ -10,25 +10,42 @@ namespace sysy {
 any SysYIRGenerator::visitCompUnit(SysYParser::CompUnitContext *ctx)
 {
 	cout<<"visitCompUnit"<<endl;
+	auto Unit = new Module;
+	assert(Unit);
+	module.reset(Unit);
+	Function* parent = nullptr;
 	// Decl: createGlobal value
+	auto basic  = new BasicBlock(parent);
+	builder.setPosition(basic,basic->end());
+	SymTable.newTable();
 	for(auto decl:ctx->decl())
+	{
+		GlobalVal  = true;
+		//module->createGlobalValue()
 		visitDecl(decl);
+	}
+	cout<<"visit decl finish!"<<endl;
 	return 0;
 }
 
 any SysYIRGenerator::visitDecl(SysYParser::DeclContext *ctx)
 {
+	cout<<"visitDecl"<<endl;
 	auto decl = (ctx->constDecl())?visitConstDecl(ctx->constDecl()):visitVarDecl(ctx->varDecl());
+	GlobalVal = false;
+	LocalVal = false;
 	return decl;
 }
 
 any SysYIRGenerator::visitBType(SysYParser::BTypeContext *ctx)
 {
+	cout<<"visitBType"<<endl;
 	return ctx->Int() ? Type::getIntType() : Type::getFloatType();
 }
 
 any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 {
+	cout<<"visitConstDecl"<<endl;
 	vector <Value*> values;
 	auto type = any_cast<Type*>(visitBType(ctx->bType()));
 	for(auto constdef:ctx->constDef())
@@ -47,8 +64,16 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 				auto value = any_cast<Value*>(visitConstInitVal(constdef->constInitVal()));
 				//Init List???
 				//auto store = builder.createStoreInst(value,alloca);
+				
 			}
 			values.push_back(alloca);
+			if(GlobalVal)
+			{
+				//auto gval = module->createGlobalValue(name,type,dims);
+				//gval->HaveInit();
+				SymTable.insert(name,alloca);
+			}
+			
 			
 		}
 		else
@@ -76,6 +101,12 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 			
 			}
 			values.push_back(alloca);
+			if(GlobalVal)
+			{
+				//auto gval = module->createGlobalValue(name,type,{});
+				//gval->HaveInit();
+				SymTable.insert(name,alloca);
+			}
 		}
 	}
 	return values;
@@ -83,6 +114,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 
 any SysYIRGenerator::visitConstInitVal(SysYParser::ConstInitValContext *ctx)
 {
+	cout<<"visitConstInitVal"<<endl;
 	if(ctx->constExp())
 	{
 		auto constexp = visitConstExp(ctx->constExp());
@@ -103,6 +135,7 @@ any SysYIRGenerator::visitConstInitVal(SysYParser::ConstInitValContext *ctx)
 
 any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 {
+	cout<<"visitVarDecl"<<endl;
 	vector <Value*> values;
 	auto type = any_cast<Type*>(visitBType(ctx->bType()));
 	for(auto vardef:ctx->varDef())
@@ -123,6 +156,12 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 				//auto store = builder.createStoreInst(value,alloca);
 			}
 			values.push_back(alloca);
+			if(GlobalVal)
+			{
+				//auto gval = module->createGlobalValue(name,type,dims);
+				//gval->HaveInit();
+				SymTable.insert(name,alloca);
+			}
 			
 		}
 		else
@@ -131,7 +170,9 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 			if(vardef->Assign())
 			{
 				auto value = any_cast<Value*>(visitInitVal(vardef->initVal()));
+				cout<<"getVardefAssignInitVal"<<endl;
 				auto store = builder.createStoreInst(value,alloca);
+				cout<<"createStoreInst"<<endl;
 			}
 			else
 			{
@@ -150,6 +191,14 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 			
 			}
 			values.push_back(alloca);
+			if(GlobalVal)
+			{
+				//auto gval = module->createGlobalValue(name,type,{});
+				SymTable.insert(name,alloca);
+				cout<<"have create globalvalue"<<endl;
+				//gval->HaveInit();
+				cout<<"Have Init"<<endl;
+			}
 		}
 		
 	}
@@ -158,6 +207,7 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 
 any SysYIRGenerator::visitInitVal(SysYParser::InitValContext *ctx)
 {
+	cout<<"visitInitVal"<<endl;
 	if(ctx->exp())
 	{
 		auto constexp = visitExp(ctx->exp());
@@ -179,11 +229,13 @@ any SysYIRGenerator::visitInitVal(SysYParser::InitValContext *ctx)
 
 any SysYIRGenerator::visitConstExp(SysYParser::ConstExpContext *ctx)
 {
+	cout<<"visitConstExp"<<endl;
 	return visitAddExp(ctx->addExp());
 }
 
 any SysYIRGenerator::visitCond(SysYParser::CondContext* ctx)
 {
+	cout<<"visitCond"<<endl;
 	return visitLOrExp(ctx->lOrExp());
 }
 
@@ -709,7 +761,10 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 	cout<<"visitUnaryExp"<<endl;
 	if(Primary_child != nullptr)
 	{
-		return visitPrimaryExp(ctx->primaryExp());
+		
+		auto pri = visitPrimaryExp(ctx->primaryExp());
+		cout<<"got visitPrimaryExp"<<endl;
+		return pri;
 	}
 	else if(ctx->Identifier())
 	{
@@ -727,7 +782,7 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 			args.push_back(any_cast<Value *>(visitExp(param)));
 		}
 		
-		builder.createCallInst(callee,args,entry);
+		return builder.createCallInst(callee,args,entry);
 		
 		
 	} //identifier table!!!
@@ -799,8 +854,15 @@ any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
 	}
 	else if(ctx->lVal())
 	{
-		//return visitLVal(ctx->lVal());//waiting
-		cout<<"This is LVal, waiting to edit"<<endl;
+		cout<<"getLVal"<<endl;
+		auto addr = any_cast<Value*>(visitLVal(ctx->lVal()));//waiting
+		cout<<"get addr"<<endl;
+		SymTable.view();
+		auto value = builder.createLoadInst(addr);
+		cout<<"load value"<<endl;
+		//SymTable.view();
+		return value;
+		//cout<<"This is LVal, waiting to edit"<<endl;
 	}
 	else if(ctx->number())
 	{
@@ -814,10 +876,15 @@ any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
 
 any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx)
 {
+	cout<<"visitLVal"<<endl;
 	auto name = ctx->Identifier()->getText();
   	auto exps = ctx->exp();
   	// notation table! name,dim,leftvalue,......hard!!!
-  	return 0;
+  	//return module->getGlobalValue(name)->init();
+  	auto addr = SymTable.query(name);
+  	cout<<"from table get LVal"<<endl;
+  	return addr;
+  	//return 0;
 	
 }
 
