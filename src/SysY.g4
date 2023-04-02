@@ -87,7 +87,7 @@ funcRParam: number # expAsRParam | string # stringAsRParam;
 number: IntConst | FloatConst;
 string: String;*/
 
-exp: addExp;
+
 compUnit: (decl | funcDef)+ EOF;
 decl: constDecl | varDecl;
 constDecl: Const bType constDef (Comma constDef)* Semicolon;
@@ -110,6 +110,7 @@ stmt: lVal'='exp Semicolon | (exp)? Semicolon | block
      |While LeftBracket cond RightBracket stmt
      |Break Semicolon | Continue Semicolon
      |Return (exp)? Semicolon;
+exp: addExp;
 cond: lOrExp;
 lVal: Identifier (LeftSquareBracket exp RightSquareBracket)*;
 primaryExp: LeftBracket exp RightBracket | lVal | number;

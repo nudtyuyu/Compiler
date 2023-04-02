@@ -26,13 +26,13 @@ int main(int argc, char **argv) {
   CommonTokenStream tokens(&lexer);
   SysYParser parser(&tokens);
   //auto module = parser.module();
-  //auto compile = parser.compUnit();
-  auto exp = parser.exp();
+  auto compile = parser.compUnit();
+  //auto exp = parser.exp();
 
   SysYIRGenerator generator;
   //generator.visitModule();
-  //generator.visitCompUnit(compile);
-  auto IR = generator.visitExp(exp);
+  generator.visitCompUnit(compile);
+  //auto IR = generator.visitExp(exp);
 
   return EXIT_SUCCESS;
 }
