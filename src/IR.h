@@ -259,6 +259,7 @@ class Function;
  */
 class BasicBlock : public Value {
   friend class Function;
+  friend class IRBuilder; ///< 处理全局声明时不在Function中，必须通过IRBuilder创建第一个基本块
 
 public:
   using inst_list = std::list<std::unique_ptr<Instruction>>;
@@ -577,7 +578,7 @@ class AllocaInst : public Instruction {
 protected:
   AllocaInst(Type *type, const std::vector<Value *> &dims = {},
              BasicBlock *parent = nullptr, const std::string &name = "")
-      : Instruction(kAlloca, type, parent, name) {
+      : Instruction(kAlloca, Type::getPointerType(type), parent, name) { ///< bug fixed: alloca指令应当返回指针（既是定义要求，也是其它指令的需要）
     addOperands(dims);
   }
 

@@ -1,12 +1,12 @@
 /**
- * @file SymbolTable.h
- * @brief 符号表的声明。定义见SymbolTable.cpp
+ * @file IDTable.h
+ * @brief 符号表的声明。定义见IDTable.cpp
  * @author Rhein_E
  * @version 1.0
  * @date 2023-03-28
  * 
  * @details 以栈的方式组织多个符号表，每个符号表对应一个域。
- * 使用时只需要创建一个SymbolTable类。完整的示例见文件末尾。
+ * 使用时只需要创建一个IDTable类。完整的示例见文件末尾。
  */
 #include <iostream>
 #include <map>
@@ -18,7 +18,7 @@
 
 namespace sysy {
 
-class SymbolTable {
+class IDTable {
 using SubTable=std::map<std::string, Value *>;
 private:
     std::vector<SubTable *> table;
@@ -62,10 +62,10 @@ public:
 } // namespace sysy
 
 /*
-#include"SymbolTable.h"
+#include"IDTable.h"
 #include "IR.h"
 int main() {
-    sysy::SymbolTable table;
+    sysy::IDTable table;
 
     // 一级符号表（全局）
     table.newTable(); 

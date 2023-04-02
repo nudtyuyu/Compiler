@@ -12,7 +12,7 @@ private:
   BasicBlock::iterator position;
 
 public:
-  IRBuilder() = default;
+  IRBuilder():block(new BasicBlock(nullptr)), position(block->end()) {} ///< 原始版本IRBuilder默认没有BasicBlock，遇到全局声明会出错
   IRBuilder(BasicBlock *block) : block(block), position(block->end()) {}
   IRBuilder(BasicBlock *block, BasicBlock::iterator position)
       : block(block), position(position) {}

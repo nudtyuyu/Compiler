@@ -13,11 +13,8 @@ any SysYIRGenerator::visitCompUnit(SysYParser::CompUnitContext *ctx)
 	auto Unit = new Module;
 	assert(Unit);
 	module.reset(Unit);
-	Function* parent = nullptr;
 	// Decl: createGlobal value
-	auto basic  = new BasicBlock(parent);
-	builder.setPosition(basic,basic->end());
-	SymTable.newTable();
+	idt.newTable();
 	for(auto decl:ctx->decl())
 	{
 		GlobalVal  = true;
@@ -71,7 +68,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 			{
 				//auto gval = module->createGlobalValue(name,type,dims);
 				//gval->HaveInit();
-				SymTable.insert(name,alloca);
+				idt.insert(name,alloca);
 			}
 			
 			
@@ -105,7 +102,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 			{
 				//auto gval = module->createGlobalValue(name,type,{});
 				//gval->HaveInit();
-				SymTable.insert(name,alloca);
+				idt.insert(name,alloca);
 			}
 		}
 	}
@@ -160,7 +157,7 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 			{
 				//auto gval = module->createGlobalValue(name,type,dims);
 				//gval->HaveInit();
-				SymTable.insert(name,alloca);
+				idt.insert(name,alloca);
 			}
 			
 		}
@@ -194,7 +191,7 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 			if(GlobalVal)
 			{
 				//auto gval = module->createGlobalValue(name,type,{});
-				SymTable.insert(name,alloca);
+				idt.insert(name,alloca);
 				cout<<"have create globalvalue"<<endl;
 				//gval->HaveInit();
 				cout<<"Have Init"<<endl;
@@ -857,35 +854,75 @@ any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
 		cout<<"getLVal"<<endl;
 		auto addr = any_cast<Value*>(visitLVal(ctx->lVal()));//waiting
 		cout<<"get addr"<<endl;
-		SymTable.view();
+		idt.view();
 		auto value = builder.createLoadInst(addr);
 		cout<<"load value"<<endl;
-		//SymTable.view();
-		return value;
+		//idt.view();
+		return (Value *)value;
 		//cout<<"This is LVal, waiting to edit"<<endl;
 	}
 	else if(ctx->number())
 	{
 		auto num = visitNumber(ctx->number());//waiting
 		cout<<"getnum"<<endl;
-		return num;
+		return (Value *)num;
 	}
-	return nullptr;
+	return (Value *)nullptr;
 	
 }
 
 any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx)
 {
-	cout<<"visitLVal"<<endl;
+	cout<<"visitLVal :" << ctx->getText() << endl;
 	auto name = ctx->Identifier()->getText();
-  	auto exps = ctx->exp();
-  	// notation table! name,dim,leftvalue,......hard!!!
-  	//return module->getGlobalValue(name)->init();
-  	auto addr = SymTable.query(name);
-  	cout<<"from table get LVal"<<endl;
-  	return addr;
-  	//return 0;
-	
+  	vector<Value *> exps;
+	auto *id = idt.query(name);
+
+	for (auto *exp : ctx->exp()) {
+		exps.push_back(any_cast<Value *>(visitExp(exp)));
+	}
+
+	if (id != nullptr) {
+		// local variable
+		cout << "local variable found: " << name << endl;
+		auto *lval = dynamic_cast<AllocaInst *>(id);
+		assert(lval != nullptr);
+		int ndim = lval->getNumDims();
+		Value *last = builder.createAllocaInst(Type::getPointerType(lval->getType())); ///< 这里baseType可能不对，后面再改
+		if (ndim == 0) {
+			// not array
+			cout << "not array: " << name << endl;
+			return (Value *)lval;
+		} else {
+			// array
+			last = builder.createAddInst(last, exps[0]);
+			for (int i = 1; i < ndim; ++i) {
+				last = builder.createMulInst(lval->getDim(i), last);
+				last = builder.createAddInst(last, exps[i]);
+			}
+			return (Value *)builder.createLoadInst(last);
+		}
+	} else {
+		// global variable
+		auto *lval = module->getGlobalValue(name);
+		assert(lval != nullptr);
+		int ndim = lval->getNumDims();
+		Value *last = builder.createAllocaInst(Type::getPointerType(lval->getType())); ///< 这里baseType可能不对，后面再改
+		if (ndim == 0) {
+			// not array
+			return (Value *)lval;
+		} else {
+			// array
+			last = builder.createAddInst(last, exps[0]);
+			for (int i = 1; i < ndim; ++i) {
+				last = builder.createMulInst(lval->getDim(i), last);
+				last = builder.createAddInst(last, exps[i]);
+			}
+			return (Value *)builder.createLoadInst(last);
+		}
+	}
+
+  	return 0;
 }
 
 any SysYIRGenerator::visitNumber(SysYParser::NumberContext *ctx)
@@ -907,7 +944,7 @@ any SysYIRGenerator::visitNumber(SysYParser::NumberContext *ctx)
 		float value = atof(ctx->FloatConst()->getText().c_str());
 		return (Value*)ConstantValue::get(value);		
 	}
-	return nullptr;
+	return (Value*)nullptr;
 }
 /*any SysYIRGenerator::visitModule(SysYParser::ModuleContext *ctx) {
   auto pModule = new Module();
