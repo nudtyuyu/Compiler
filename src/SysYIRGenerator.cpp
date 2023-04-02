@@ -815,10 +815,52 @@ any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
 any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx)
 {
 	auto name = ctx->Identifier()->getText();
-  	auto exps = ctx->exp();
-  	// notation table! name,dim,leftvalue,......hard!!!
+  	vector<Value *> exps;
+	auto *id = idt.query(name);
+
+	for (auto *exp : ctx->exp()) {
+		exps.push_back(any_cast<Value *>(visitExp(exp)));
+	}
+
+	if (id != nullptr) {
+		// local variable
+		auto *lval = dynamic_cast<AllocaInst *>(id);
+		assert(lval != nullptr);
+		int ndim = lval->getNumDims();
+		Value *last = builder.createAllocaInst(Type::getPointerType(lval->getType())); ///< 这里baseType可能不对，后面再改
+		if (ndim == 0) {
+			// not array
+			return (Value *)lval;
+		} else {
+			// array
+			last = builder.createAddInst(last, exps[0]);
+			for (int i = 1; i < ndim; ++i) {
+				last = builder.createMulInst(lval->getDim(i), last);
+				last = builder.createAddInst(last, exps[i]);
+			}
+			return (Value *)builder.createLoadInst(last);
+		}
+	} else {
+		// global variable
+		auto *lval = module->getGlobalValue(name);
+		assert(lval != nullptr);
+		int ndim = lval->getNumDims();
+		Value *last = builder.createAllocaInst(Type::getPointerType(lval->getType())); ///< 这里baseType可能不对，后面再改
+		if (ndim == 0) {
+			// not array
+			return (Value *)lval;
+		} else {
+			// array
+			last = builder.createAddInst(last, exps[0]);
+			for (int i = 1; i < ndim; ++i) {
+				last = builder.createMulInst(lval->getDim(i), last);
+				last = builder.createAddInst(last, exps[i]);
+			}
+			return (Value *)builder.createLoadInst(last);
+		}
+	}
+
   	return 0;
-	
 }
 
 any SysYIRGenerator::visitNumber(SysYParser::NumberContext *ctx)

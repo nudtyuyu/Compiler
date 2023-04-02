@@ -5,6 +5,7 @@
 #include "IRBuilder.h"
 #include "SysYBaseVisitor.h"
 #include "SysYParser.h"
+#include "IDTable.h"
 
 namespace sysy {
 
@@ -14,6 +15,7 @@ private:
   IRBuilder builder;
   std::vector<BasicBlock *> loopEntry;
   std::vector<BasicBlock *> loopExit;
+  IDTable idt;
 
 public:
   SysYIRGenerator() = default;

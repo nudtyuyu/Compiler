@@ -16,6 +16,7 @@ add_executable(sysyc
   sysyc.cpp
   IR.cpp
   SysYIRGenerator.cpp
+  IDTable.cpp
 )
 target_include_directories(sysyc PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(sysyc PRIVATE SysYParser)
