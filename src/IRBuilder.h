@@ -35,6 +35,7 @@ public:
     block->getInstructions().emplace(position, inst);
     return inst;
   }
+  // Add some Inst: Pos,FPos,And,Or,Call
   UnaryInst *createPosInst(Value *operand, const std::string &name = "") {
     return createUnaryInst(Instruction::kPos, Type::getIntType(), operand,
                            name);
@@ -242,6 +243,14 @@ public:
                            BasicBlock *parent = nullptr,
                            const std::string &name = "") {
     auto inst = new CallInst(callee, args, parent, name);
+    assert(inst);
+    block->getInstructions().emplace(position, inst);
+    return inst;
+  }
+  InitInst *createStoreInst(std::vector<Value *>value, Value *pointer,
+                             const std::vector<Value *> &indices = {},
+                             const std::string &name = "") {
+    auto inst = new InitInst(value, pointer, indices, block, name);
     assert(inst);
     block->getInstructions().emplace(position, inst);
     return inst;

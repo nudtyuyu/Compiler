@@ -388,6 +388,7 @@ public:
     kAlloca = 0x1UL << 34,
     kLoad = 0x1UL << 35,
     kStore = 0x1UL << 36,
+    kInit = 0x1UL << 41
     // constant
     // kConstant = 0x1UL << 37,
   };
@@ -420,7 +421,7 @@ public:
     return kind & UnaryOpMask;
   }
   bool isMemory() const {
-    static constexpr uint64_t MemoryOpMask = kAlloca | kLoad | kStore;
+    static constexpr uint64_t MemoryOpMask = kAlloca | kLoad | kStore | kInit;
     return kind & MemoryOpMask;
   }
   bool isTerminator() const {
@@ -632,6 +633,35 @@ public:
   }
   Value *getIndex(int index) const { return getOperand(index + 2); }
 }; // class StoreInst
+
+
+//! Initiate the Array
+class InitInst : public Instruction {
+  friend class IRBuilder;
+
+protected:
+  InitInst(std::vector<Value *>value, Value *pointer,
+            const std::vector<Value *> &indices = {},
+            BasicBlock *parent = nullptr, const std::string &name = "")
+      : Instruction(kInit, Type::getVoidType(), parent, name) {
+    addOperands(value);
+    addOperand(pointer);
+    addOperands(indices);
+    valueNum=value.size();
+  }
+
+public:
+  int valueNum;
+  int getNumIndices() const { return getNumOperands() - 1 - valueNum; }
+  auto getValue() const { return make_range(operand_begin(),operand_begin()+valueNum-1); }
+  Value *getPointer() const { return getOperand(valueNum); }
+  auto getIndices() const {
+    return make_range(operand_begin() + valueNum+1, operand_end());
+  }
+  Value *getIndex(int index) const { return getOperand(index + valueNum+1); }
+}; // class InitInst
+
+
 
 class Module;
 //! Function definition
