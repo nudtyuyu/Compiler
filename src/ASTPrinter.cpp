@@ -297,8 +297,34 @@ any ASTPrinter::visitFuncFParams(SysYParser::FuncFParamsContext *ctx)
 
 any ASTPrinter::visitConstInitVal(SysYParser::ConstInitValContext *ctx)
 {
-	visitConstExp(ctx->constExp());
+	auto *child = ctx->children[0];
+	auto *exp_child = dynamic_cast<SysYParser::ConstExpContext *>(child);
+	if(exp_child != nullptr)
+	{
+		visitConstExp(ctx->constExp());
+	}
+	else if(ctx->LeftCurlyBracket())
+	{
+		cout<<ctx->LeftCurlyBracket()->getText();
+		int numv = ctx->constInitVal().size();
+		if(numv==1)
+		{
+			visitConstInitVal(ctx->constInitVal(0));
+		}
+		else if(numv>1)
+		{
+			visitConstInitVal(ctx->constInitVal(0));
+			for(int i=1;i<numv;i++)
+			{
+				cout<<ctx->Comma(i-1)->getText();
+				cout<<" ";
+				visitConstInitVal(ctx->constInitVal(i));
+			}
+		}
+		cout<<ctx->RightCurlyBracket()->getText();
+	}
 	return nullptr;
+	
 }
 
 
