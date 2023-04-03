@@ -238,13 +238,16 @@ any SysYIRGenerator::visitCond(SysYParser::CondContext* ctx)
 
 std::any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx)
 {
+	Value *ret = nullptr;
 	if (ctx->lVal() != nullptr) {
-		// visitLVal here
+		Value *ptr = any_cast<Value *>(visitLVal(ctx->lVal()));
+		Value *exp = any_cast<Value *>(visitExp(ctx->exp()));
+		ret = builder.createStoreInst(exp, ptr);
 	} else if (ctx->Return() != nullptr) {
 		Value *value = nullptr;
 		if (ctx->exp() != nullptr)
 			value = any_cast<Value *>(visitExp(ctx->exp()));
-		return builder.createReturnInst(value);
+		ret = builder.createReturnInst(value);
 	} else if (ctx->If() != nullptr) {
 		auto *block = builder.getBasicBlock();				///< 当前所在基本块
 		auto *func = block->getParent();					///< 当前所在函数
@@ -271,9 +274,9 @@ std::any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx)
 			builder.setPosition(block, elseBlock->end());
 		}
 
-		builder.createCondBrInst(cond, thenBlock, elseBlock, thenArgs, elseArgs);
+		ret = builder.createCondBrInst(cond, thenBlock, elseBlock, thenArgs, elseArgs);
 
-		// translate exitblock
+		// prepare to translate exitblock
 		block->getSuccessors().push_back(exitBlock);
 		exitBlock->getPredecessors().push_back(block);
 		builder.setPosition(exitBlock, exitBlock->end());
@@ -295,7 +298,7 @@ std::any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx)
 		// translate cond/entry block
 		builder.setPosition(entryBlock, entryBlock->end());
 		auto *cond = any_cast<Value *>(visitCond(ctx->cond()));
-		builder.createCondBrInst(cond, innerBlock, nullptr, innerArgs, std::vector<Value *>());
+		ret = builder.createCondBrInst(cond, innerBlock, nullptr, innerArgs, std::vector<Value *>());
 		
 		// translate inner block
 		builder.setPosition(innerBlock, innerBlock->end());
@@ -305,20 +308,20 @@ std::any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx)
 		loopEntry.pop_back();
 		loopExit.pop_back();
 
-		// translate exitblock
+		// prepare to translate exitblock
 		builder.setPosition(exitBlock, exitBlock->end());
 	} else if (ctx->Break()) {
 		std::vector<Value *> args;		///< 留空
-		builder.createUncondBrInst(loopExit.back(), args);
+		ret = builder.createUncondBrInst(loopExit.back(), args);
 	} else if (ctx->Continue()) {
 		std::vector<Value *> args;		///< 留空
-		builder.createUncondBrInst(loopEntry.back(), args);
+		ret = builder.createUncondBrInst(loopEntry.back(), args);
 	} else if (ctx->block()) {
-		visitBlock(ctx->block());
+		ret = any_cast<Value *>(visitBlock(ctx->block()));
 	} else if (ctx->exp()) {
-		visitExp(ctx->exp());
+		ret = any_cast<Value *>(visitExp(ctx->exp()));
 	}
-	return nullptr;
+	return ret;
 }
 
 any SysYIRGenerator::visitLOrExp(SysYParser::LOrExpContext* ctx)
@@ -853,7 +856,7 @@ any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
 	{
 		cout<<"getLVal"<<endl;
 		auto addr = any_cast<Value*>(visitLVal(ctx->lVal()));//waiting
-		cout<<"get addr"<<endl;
+		cout<<"get addr: "<<endl;
 		idt.view();
 		auto value = builder.createLoadInst(addr);
 		cout<<"load value"<<endl;
@@ -865,7 +868,7 @@ any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
 	{
 		auto num = visitNumber(ctx->number());//waiting
 		cout<<"getnum"<<endl;
-		return (Value *)num;
+		return num;
 	}
 	return (Value *)nullptr;
 	
@@ -873,56 +876,33 @@ any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
 
 any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx)
 {
-	cout<<"visitLVal :" << ctx->getText() << endl;
 	auto name = ctx->Identifier()->getText();
   	vector<Value *> exps;
-	auto *id = idt.query(name);
+	auto *ident = idt.query(name);
+	assert(ident != nullptr);
+	cout<<"visitLVal: " << ctx->getText() << endl;
 
 	for (auto *exp : ctx->exp()) {
 		exps.push_back(any_cast<Value *>(visitExp(exp)));
 	}
 
-	if (id != nullptr) {
-		// local variable
-		cout << "local variable found: " << name << endl;
-		auto *lval = dynamic_cast<AllocaInst *>(id);
-		assert(lval != nullptr);
-		int ndim = lval->getNumDims();
-		Value *last = builder.createAllocaInst(Type::getPointerType(lval->getType())); ///< 这里baseType可能不对，后面再改
-		if (ndim == 0) {
-			// not array
-			cout << "not array: " << name << endl;
-			return (Value *)lval;
-		} else {
-			// array
-			last = builder.createAddInst(last, exps[0]);
-			for (int i = 1; i < ndim; ++i) {
-				last = builder.createMulInst(lval->getDim(i), last);
-				last = builder.createAddInst(last, exps[i]);
-			}
-			return (Value *)builder.createLoadInst(last);
-		}
-	} else {
-		// global variable
-		auto *lval = module->getGlobalValue(name);
-		assert(lval != nullptr);
-		int ndim = lval->getNumDims();
-		Value *last = builder.createAllocaInst(Type::getPointerType(lval->getType())); ///< 这里baseType可能不对，后面再改
-		if (ndim == 0) {
-			// not array
-			return (Value *)lval;
-		} else {
-			// array
-			last = builder.createAddInst(last, exps[0]);
-			for (int i = 1; i < ndim; ++i) {
-				last = builder.createMulInst(lval->getDim(i), last);
-				last = builder.createAddInst(last, exps[i]);
-			}
-			return (Value *)builder.createLoadInst(last);
-		}
+	auto *base = dynamic_cast<AllocaInst *>(ident);
+	assert(base != nullptr);
+	int ndim = base->getNumDims();
+	Value *pOffset = builder.createAllocaInst(Type::getPointerType(Type::getIntType()));
+	builder.createStoreInst(ConstantValue::get(0), pOffset);
+	Value *offset = builder.createLoadInst(pOffset);
+	
+	if (ndim != 0) {
+		offset = builder.createPAddInst(offset, exps[0]);
+	}
+	for (int i = 1; i < ndim; ++i) {
+		offset = builder.createPMulInst(base->getDim(i), offset);
+		offset = builder.createPAddInst(offset, exps[i]);
 	}
 
-  	return 0;
+	Value *ptr = builder.createPAddInst(base, offset);
+	return ptr;
 }
 
 any SysYIRGenerator::visitNumber(SysYParser::NumberContext *ctx)

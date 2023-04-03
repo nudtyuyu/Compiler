@@ -246,6 +246,23 @@ public:
     block->getInstructions().emplace(position, inst);
     return inst;
   }
+  
+  // for pointer calculation
+  BinaryInst *createPAddInst(Value *lhs, Value *rhs,
+                            const std::string &name = "") {
+    Type *type = (lhs->isPointer() ? lhs->getType() : rhs->getType());
+    return createBinaryInst(Instruction::kAdd, type, lhs, rhs, name);
+  }
+  BinaryInst *createPSubInst(Value *lhs, Value *rhs,
+                            const std::string &name = "") {
+    Type *type = (lhs->isPointer() ? lhs->getType() : rhs->getType());
+    return createBinaryInst(Instruction::kSub, type, lhs, rhs, name);
+  }
+  BinaryInst *createPMulInst(Value *lhs, Value *rhs,
+                            const std::string &name = "") {
+    Type *type = (lhs->isPointer() ? lhs->getType() : rhs->getType());
+    return createBinaryInst(Instruction::kMul, type, lhs, rhs, name);
+  }
 };
 
 } // namespace sysy
