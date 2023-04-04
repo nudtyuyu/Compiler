@@ -33,27 +33,27 @@ public:
 
     virtual std::any visitBType(SysYParser::BTypeContext *context) override;
 
-    virtual std::any visitConstDef(SysYParser::ConstDefContext *context) override;
+    // virtual std::any visitConstDef(SysYParser::ConstDefContext *context) override;
 
     virtual std::any visitConstInitVal(SysYParser::ConstInitValContext *context) override;
 
     virtual std::any visitVarDecl(SysYParser::VarDeclContext *context) override;
 
-    virtual std::any visitVarDef(SysYParser::VarDefContext *context) override;
+    // virtual std::any visitVarDef(SysYParser::VarDefContext *context) override;
 
     virtual std::any visitInitVal(SysYParser::InitValContext *context) override;
 
-    virtual std::any visitFuncDef(SysYParser::FuncDefContext *context) override;
+    // virtual std::any visitFuncDef(SysYParser::FuncDefContext *context) override;
 
-    virtual std::any visitFuncType(SysYParser::FuncTypeContext *context) override;
+    // virtual std::any visitFuncType(SysYParser::FuncTypeContext *context) override;
 
-    virtual std::any visitFuncFParams(SysYParser::FuncFParamsContext *context) override;
+    // virtual std::any visitFuncFParams(SysYParser::FuncFParamsContext *context) override;
 
-    virtual std::any visitFuncFParam(SysYParser::FuncFParamContext *context) override;
+    // virtual std::any visitFuncFParam(SysYParser::FuncFParamContext *context) override;
 
-    virtual std::any visitBlock(SysYParser::BlockContext *context) override;
+    // virtual std::any visitBlock(SysYParser::BlockContext *context) override;
 
-    virtual std::any visitBlockItem(SysYParser::BlockItemContext *context) override;
+    // virtual std::any visitBlockItem(SysYParser::BlockItemContext *context) override;
 
     virtual std::any visitStmt(SysYParser::StmtContext *context) override;
 
@@ -67,13 +67,13 @@ public:
 
     virtual std::any visitNumber(SysYParser::NumberContext *context) override;
 
-    virtual std::any visitString(SysYParser::StringContext *context) override;
+    // virtual std::any visitString(SysYParser::StringContext *context) override;
 
     virtual std::any visitUnaryExp(SysYParser::UnaryExpContext *context) override;
 
-    virtual std::any visitUnaryOp(SysYParser::UnaryOpContext *context) override;
+    // virtual std::any visitUnaryOp(SysYParser::UnaryOpContext *context) override;
 
-    virtual std::any visitFuncRParams(SysYParser::FuncRParamsContext *context) override;
+    // virtual std::any visitFuncRParams(SysYParser::FuncRParamsContext *context) override;
 
     virtual std::any visitMulExp(SysYParser::MulExpContext *context) override;
 
