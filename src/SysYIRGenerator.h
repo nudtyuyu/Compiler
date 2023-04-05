@@ -20,6 +20,8 @@ public:
     bool GlobalVal;
     bool LocalVal;
     IDTable idt;
+    std::vector<int> Dims;
+    int DimNum;
 
 public:
     SysYIRGenerator() = default;

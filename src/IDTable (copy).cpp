@@ -11,7 +11,7 @@
 
 namespace sysy {
 
-bool IDTable::insert(const std::string &name, Entry ptr) {
+bool IDTable::insert(const std::string &name, Value *ptr) {
     auto &topTable = *table.back();
     if (topTable.find(name) != topTable.end())
         return false;
@@ -19,10 +19,10 @@ bool IDTable::insert(const std::string &name, Entry ptr) {
     return true;
 }
 
-Entry *IDTable::query(const std::string &name) {
+Value *IDTable::query(const std::string &name) {
     for (auto it = table.rbegin(); it != table.rend(); ++it)
         if ((*it)->find(name) != (*it)->end())
-            return &(*it)->at(name);
+            return (*it)->at(name);
     return nullptr;
 }
 
@@ -47,7 +47,7 @@ void IDTable::view() const {
         std::cout << "+---------------+---------------+\n";
         for (auto &pair : *pSubTable) {
             std::cout << "|" << std::setw(15) << pair.first;
-            std::cout << "|" << std::setw(15) << std::hex << std::showbase << (unsigned long long)pair.second.ptr << "|\n";
+            std::cout << "|" << std::setw(15) << std::hex << std::showbase << (unsigned long long)pair.second << "|\n";
         }
         std::cout.unsetf(std::cout.flags());
         std::cout << "+---------------+---------------+\n";

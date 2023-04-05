@@ -173,8 +173,9 @@ public:
 class Value {
 protected:
   Type *type;
-  std::string name;
   std::list<Use *> uses;
+public:
+  std::string name;
 
 protected:
   Value(Type *type, const std::string &name = "")
@@ -182,6 +183,7 @@ protected:
   virtual ~Value() {}
 
 public:
+  std::string getName() const {return name;}
   Type *getType() const { return type; }
   bool isInt() const { return type->isInt(); }
   bool isFloat() const { return type->isFloat(); }
@@ -455,7 +457,6 @@ class CallInst : public Instruction {
 protected:
   CallInst(Function *callee, const std::vector<Value *> args = {},
            BasicBlock *parent = nullptr, const std::string &name = "");
-
 public:
   Function *getCallee();
   auto getArguments() {
@@ -730,11 +731,25 @@ class Module {
 protected:
   std::map<std::string, std::unique_ptr<Function>> functions;
   std::map<std::string, std::unique_ptr<GlobalValue>> globals;
+  std::map<std::string, int> integers;
+  std::map<std::string, float> floats;
 
 public:
   Module() = default;
 
 public:
+  int* createInteger(const std::string &name, int value) {
+    auto result = integers.try_emplace(name, value);
+    if (not result.second)
+      return nullptr;
+    return &result.first->second;
+  };
+  float* createFloat(const std::string &name, float value) {
+    auto result = floats.try_emplace(name, value);
+    if (not result.second)
+      return nullptr;
+    return &result.first->second;
+  };
   Function *createFunction(const std::string &name, Type *type) {
     auto result = functions.try_emplace(name, new Function(this, type, name));
     if (not result.second)
@@ -754,6 +769,18 @@ public:
     if (result == functions.end())
       return nullptr;
     return result->second.get();
+  }
+  const int* getInteger(const std::string &name) const {
+    auto result = integers.find(name);
+    if (result == integers.end())
+      return nullptr;
+    return &result->second;
+  }
+  const float* getFloat(const std::string &name) const {
+    auto result = floats.find(name);
+    if (result == floats.end())
+      return nullptr;
+    return &result->second;
   }
   GlobalValue *getGlobalValue(const std::string &name) const {
     auto result = globals.find(name);

@@ -21,20 +21,17 @@ namespace sysy {
 struct Entry
 {
 	Value * ptr;
-	int ValType; // 0 is constantVal, 1 is varVal
+	int VarType; // 0 is constantVal, 1 is varVal
 	union
 	{
 		int iValue;
 		float fValue;
 	};
-	Entry() = default;
-	Entry(Value* v,int t, int value):ptr(v),ValType(t),iValue(value){};
-	Entry(Value* v,int t, float value):ptr(v),ValType(t),fValue(value){};
 	
 };
 
 class IDTable {
-using SubTable=std::map<std::string, Entry>;
+using SubTable=std::map<std::string, Value *>;
 private:
     std::vector<SubTable *> table;
 
@@ -45,9 +42,9 @@ public:
      * @return true 插入成功 \\
      * @return false 插入失败，通常表明有名字冲突
      * @author Rhein_E
-     * @example table.insert("x", (sysy::Entry *) 0x1000080);
+     * @example table.insert("x", (sysy::Value *) 0x1000080);
      */
-    bool insert(const std::string &name, Entry ptr);
+    bool insert(const std::string &name, Value *ptr);
 
     /**
      * @brief  查询符号
@@ -55,7 +52,7 @@ public:
      * @return 返回一个指向Value对象的指针，若为nullptr表示没有找到对应名字的符号
      * @author Rhein_E
      */
-    Entry *query(const std::string &name);
+    Value *query(const std::string &name);
 
     /**
      * @brief 创建一个子表并入栈

@@ -102,7 +102,7 @@ ConstantValue *ConstantValue::get(int value, const std::string &name) {
   auto iter = intConstants.find(value);
   if (iter != intConstants.end())
     return iter->second.get();
-  auto inst = new ConstantValue(value);
+  auto inst = new ConstantValue(value,name);
   assert(inst);
   auto result = intConstants.emplace(value, inst);
   return result.first->second.get();
@@ -113,7 +113,7 @@ ConstantValue *ConstantValue::get(float value, const std::string &name) {
   auto iter = floatConstants.find(value);
   if (iter != floatConstants.end())
     return iter->second.get();
-  auto inst = new ConstantValue(value);
+  auto inst = new ConstantValue(value,name);
   assert(inst);
   auto result = floatConstants.emplace(value, inst);
   return result.first->second.get();
