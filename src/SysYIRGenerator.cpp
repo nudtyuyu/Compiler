@@ -298,15 +298,22 @@ any SysYIRGenerator::visitFuncDef(SysYParser::FuncDefContext *ctx) {
 	vector<string> paramNames;
 	for (auto *fparam : ctx->funcFParams()->funcFParam()) {
 		paramTypes.emplace_back(any_cast<Type *>(visitBType(fparam->bType())));
-		paramNames.emplace_back(fparam->getText());
+		paramNames.emplace_back(fparam->Identifier()->getText());
 	}
 	Type *funcType = Type::getFunctionType(retType, paramTypes);
 	auto *function = module->createFunction(ctx->Identifier()->getText(), funcType);
 	auto *entry = function->getEntryBlock();
-	for (int i = 0; i < paramTypes.size(); ++i)
-		entry->createArgument(paramTypes[i], paramNames[i]);
 	builder.setPosition(entry->end());
+	idt.newTable();
+	for (int i = 0; i < paramTypes.size(); ++i) {
+		auto *arg = entry->createArgument(paramTypes[i], paramNames[i]);
+		auto *ptr = builder.createAllocaInst(paramTypes[i]);
+		builder.createStoreInst(arg, ptr);
+		// 这里还要插入符号表，先等符号表的实现定下来
+	}
+	idt.view();
 	visitBlock(ctx->block());
+	idt.destroyTop();
 
 	return function;
 }
