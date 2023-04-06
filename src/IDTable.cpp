@@ -11,11 +11,11 @@
 
 namespace sysy {
 
-bool IDTable::insert(const std::string &name, Entry ptr) {
+bool IDTable::insert(const std::string &name, Entry entry) {
     auto &topTable = *table.back();
     if (topTable.find(name) != topTable.end())
         return false;
-    topTable[name] = ptr;
+    topTable[name] = entry;
     return true;
 }
 

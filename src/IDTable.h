@@ -42,12 +42,13 @@ public:
     /**
      * @brief 插入符号
      * @param[in] name 符号名字
+     * @param[in] entry 符号表项 
      * @return true 插入成功 \\
      * @return false 插入失败，通常表明有名字冲突
      * @author Rhein_E
      * @example table.insert("x", (sysy::Entry *) 0x1000080);
      */
-    bool insert(const std::string &name, Entry ptr);
+    bool insert(const std::string &name, Entry entry);
 
     /**
      * @brief  查询符号

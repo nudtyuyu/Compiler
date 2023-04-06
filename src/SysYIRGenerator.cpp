@@ -22,7 +22,11 @@ any SysYIRGenerator::visitCompUnit(SysYParser::CompUnitContext *ctx)
 		visitDecl(decl);
 	}
 	cout<<"visit decl finish!"<<endl;
-	return 0;
+	for (auto *func : ctx->funcDef())
+		visitFuncDef(func);
+	
+	cout << "finish!" << endl;
+	return nullptr;
 }
 
 
@@ -288,19 +292,48 @@ any SysYIRGenerator::visitInitVal(SysYParser::InitValContext *ctx)
 	return nullptr;
 }
 
-// visitFuncDef here
+any SysYIRGenerator::visitFuncDef(SysYParser::FuncDefContext *ctx) {
+	Type *retType = any_cast<Type *>(visitFuncType(ctx->funcType()));
+	vector<Type *> paramTypes;
+	vector<string> paramNames;
+	for (auto *fparam : ctx->funcFParams()->funcFParam()) {
+		paramTypes.emplace_back(any_cast<Type *>(visitBType(fparam->bType())));
+		paramNames.emplace_back(fparam->getText());
+	}
+	Type *funcType = Type::getFunctionType(retType, paramTypes);
+	auto *function = module->createFunction(ctx->Identifier()->getText(), funcType);
+	auto *entry = function->getEntryBlock();
+	for (int i = 0; i < paramTypes.size(); ++i)
+		entry->createArgument(paramTypes[i], paramNames[i]);
+	builder.setPosition(entry->end());
+	visitBlock(ctx->block());
 
-// visitFuncType here
+	return function;
+}
 
-// visitFuncFParams here
+any SysYIRGenerator::visitFuncType(SysYParser::FuncTypeContext *ctx) {
+	if (ctx->Float())
+		return Type::getFloatType();
+	else if (ctx->Int())
+		return Type::getIntType();
+	else
+		return Type::getVoidType();
+}
 
-// visitFuncFParam here
+any SysYIRGenerator::visitBlock(SysYParser::BlockContext *ctx) {
+	for (auto *blockItem: ctx->blockItem())
+		visitBlockItem(blockItem);
+	return nullptr;
+}
 
-// visitBlock here
+any SysYIRGenerator::visitBlockItem(SysYParser::BlockItemContext *ctx) {
+	if (ctx->decl() != nullptr)
+		visitDecl(ctx->decl());
+	else visitStmt(ctx->stmt());
+	return nullptr;
+}
 
-// visitBlockItem here
-
-std::any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx) {
+any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx) {
     Value *ret = nullptr;
     if (ctx->lVal() != nullptr) {
         Value *ptr = any_cast<Value *>(visitLVal(ctx->lVal()));
@@ -520,9 +553,6 @@ any SysYIRGenerator::visitNumber(SysYParser::NumberContext *ctx)
 	return (Value*)nullptr;
 }
 
-// visitString here
-
-
 any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 {
 	auto *child = ctx->children[0];
@@ -654,10 +684,6 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 	}
 	return nullptr;
 }
-
-// visitUnaryOp here
-
-// visitFuncRParams here
 
 any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 {

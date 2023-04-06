@@ -65,9 +65,6 @@ Or: '||';
 Assign: '=';
 
 
-
-String: '"' (ESC | .)*? '"';
-
 fragment ESC: '\\"' | '\\\\';
 
 /*WS: [ \t\r\n] -> channel(HIDDEN);*/
@@ -79,13 +76,6 @@ COMMENT: '/*' .*? '*/' -> skip;
 /*===-------------------------------------------===*/
 /* Syntax rules                                    */
 /*===-------------------------------------------===*/
-
-/*funcRParams: funcRParam (Comma funcRParam)* EOF;
-
-funcRParam: number # expAsRParam | string # stringAsRParam;
-
-number: IntConst | FloatConst;
-string: String;*/
 
 
 compUnit: (decl | funcDef)+ EOF;
@@ -115,7 +105,6 @@ cond: lOrExp;
 lVal: Identifier (LeftSquareBracket exp RightSquareBracket)*;
 primaryExp: LeftBracket exp RightBracket | lVal | number;
 number: IntConst | FloatConst;
-string: String;
 unaryExp: primaryExp | Identifier LeftBracket (funcRParams)? RightBracket
 	 |unaryOp unaryExp;
 unaryOp: Add | Sub | Not;
