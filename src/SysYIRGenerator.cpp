@@ -15,6 +15,7 @@ any SysYIRGenerator::visitCompUnit(SysYParser::CompUnitContext *ctx)
 	module.reset(Unit);
 	// Decl: createGlobal value
 	idt.newTable();
+	aryt.newTable();
 	for(auto decl:ctx->decl())
 	{
 		GlobalVal  = true;
@@ -71,22 +72,15 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 				auto value = any_cast<std::vector<Value*>>(visitConstInitVal(constdef->constInitVal()));
 				
 				//Init List???
-				//auto store = builder.createStoreInst(value,alloca);
+				auto store = builder.createStoreInst(value,alloca);
 				
 			}
+			cout<<"Put constant array into aryt"<<endl;
 			values.push_back(alloca);
-			if(GlobalVal)
-			{
-				//auto gval = module->createGlobalValue(name,Type::getPointerType(type),dims);
-				//gval->HaveInit();
-				//idt.insert(name,alloca);
-			}
-			if(LocalVal)
-			{
-				
-				//Entry(alloca,type,
-				//idt.insert(name,alloca);
-			}
+			AEntry entry(alloca,0,dims);
+			aryt.insert(name,entry);
+			cout<<"insert aryt successfully!"<<endl;
+			
 			
 			
 		}
@@ -198,18 +192,8 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 				//auto store = builder.createStoreInst(value,alloca);
 			}
 			values.push_back(alloca);
-			if(GlobalVal)
-			{
-				//auto gval = module->createGlobalValue(name,Type::getPointerType(type),dims);
-				//gval->HaveInit();
-				//idt.insert(name,alloca);
-				
-			}
-			if(LocalVal)
-			{
-				//idt.insert(name,alloca);
-				
-			}
+			AEntry entry(alloca,0,dims);
+			aryt.insert(name,entry);
 			
 		}
 		else
@@ -441,16 +425,45 @@ any SysYIRGenerator::visitCond(SysYParser::CondContext* ctx)
 
 any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx) {
     auto name = ctx->Identifier()->getText();
+    std::string Name = name;
     vector<Value *> exps;
+    //vector<int> dimv;
+    bool constflag = true;
     auto *entry = idt.query(name);
-    assert(entry != nullptr);
-    auto *ident = entry->ptr;
+    auto *entry2 = aryt.query(name);
+    //assert(entry != nullptr);
+    assert(!(entry==nullptr && entry2==nullptr));
+    auto *ident = (entry!=nullptr)?entry->ptr:entry2->ptr;
     assert(ident != nullptr);
     cout << "visitLVal: " << ctx->getText() << endl;
 
     for (auto *exp : ctx->exp()) {
-        exps.push_back(any_cast<Value *>(visitExp(exp)));
+    	auto *e = any_cast<Value *>(visitExp(exp));
+        exps.push_back(e);
+        auto *d = module->getInteger(e->name);
+        if(d!=nullptr)
+        {
+        	char num[50]={0};
+        	snprintf(num,sizeof(num),"%d",*d);
+        	cout<<"num: "<<num<<endl;
+        	Name += ',';
+        	Name += num;
+        	cout<<"Name: "<<Name<<endl;
+        }
+        if(d==nullptr)
+        {
+        	Name +=',';
+        	Name += e->name;
+        	constflag = false;
+        }
+        
+        
     }
+    if(constflag==false)
+    {
+    	Name = "0"+Name;
+    }
+    cout<<"LVal Name: "<<Name<<endl;
 
     auto *base = dynamic_cast<AllocaInst *>(ident);
     assert(base != nullptr);
@@ -467,7 +480,7 @@ any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx) {
         offset = builder.createPAddInst(offset, exps[i]);
     }
 
-    Value *ptr = builder.createPAddInst(base, offset,name);
+    Value *ptr = builder.createPAddInst(base, offset,Name);
     return ptr;
 }
 
@@ -487,6 +500,21 @@ any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
 		auto name = addr->name;
 		cout<<"the addr name: "<<name<<endl;
 		auto *ptr = idt.query(name);
+		int index = name.find(",",0);
+		cout<<"index of comma: "<<index<<endl;
+		AEntry *ptr2;
+		if(ptr==nullptr && name.substr(0,1)!="0")
+		{
+			cout<<"query ptr2! 000"<<endl;
+			cout<<"name.substr: "<<name.substr(0,index)<<endl;
+			ptr2 = aryt.query(name.substr(0,index));
+			
+		}
+		else
+		{
+			cout<<"query ptr2! 111"<<endl;
+			ptr2 = aryt.query(name.substr(1,index));
+		}
 		//auto *found = module->getInteger(name);
 		if(ptr!=nullptr)
 		{
@@ -509,6 +537,31 @@ any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
 				}
 			}
 		}
+		else if(ptr2!=nullptr)
+		{
+			/// Here!!!Big Question!!! How to get the value!!!
+			/// The constant value of every element!!!
+			cout<<"ptr2!!!!"<<endl;
+			int Var = ptr->ValType;
+			auto *ident = dynamic_cast<PointerType*>(ptr->ptr->getType());
+			auto *identType = ident->getBaseType();
+			cout<<"ValType: "<<Var<<endl;
+			if(Var==0 && name.substr(0,1)!="0")
+			{
+				if(identType->isInt())
+				{
+					cout<<"add const val to module integer!"<<endl;
+					module->createInteger(name,ptr->iValue);
+				}
+				else if(identType->isFloat())
+				{
+					cout<<"add const val to module float!"<<endl;
+					module->createFloat(name,ptr->fValue);
+				}
+			}
+		}
+		if(ptr2!=nullptr && name.substr(0,1)=="0")
+			name = name.substr(1,name.length());
 		auto value = builder.createLoadInst(addr,{},name);
 		cout<<"load value"<<endl;
 		//idt.view();

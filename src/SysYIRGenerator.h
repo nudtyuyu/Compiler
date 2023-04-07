@@ -6,7 +6,7 @@
 #include "SysYBaseVisitor.h"
 #include "SysYParser.h"
 #include "IDTable.h"
-
+#include "ArrayTable.h"
 namespace sysy {
 
 class SysYIRGenerator : public SysYBaseVisitor {
@@ -20,6 +20,7 @@ public:
     bool GlobalVal;
     bool LocalVal;
     IDTable idt;
+    ArrayTable aryt;
     std::vector<int> Dims;
     int DimNum;
 
