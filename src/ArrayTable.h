@@ -27,7 +27,7 @@ public:
 	std::vector<Value*> dims; // dim info
 
 private:
-    bool check(InitList *cur, int depth) const {
+    void check(InitList *cur, int depth) const {
         assert(depth < dims.size());
         assert(cur->getNumOperands() < dims[depth]);
         for (auto use : cur->getOperands()) {
@@ -43,7 +43,7 @@ public:
 	AEntry(Value *_ptr, InitList* _value, std::vector<Value*> &_dims):ptr(_ptr), value(_value), dims(_dims)
 	{
         // 检查是否越界
-        assert(check(value, 0));
+        check(value, 0);
 
 		// dims.clear();
 		// std::cout<<"Init a AEntry!"<<std::endl;
