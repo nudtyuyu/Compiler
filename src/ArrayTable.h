@@ -21,11 +21,16 @@ namespace sysy {
 struct AEntry
 {
 	Value * ptr;
+	int BType; // 0 is int, 1 is float
 	int ValType; // 0 is constantVal, 1 is varVal
 	//int DataType; //0 is int, 1 is float;
 	std::vector<Value*> dims; // dim info
+	union{
+		std::vector<vector<int> > idata;
+		std::vector<vector<float> >fdata;
+	};
 	AEntry() = default;
-	AEntry(Value* v,int t, std::vector<Value*> dim):ptr(v),ValType(t)
+	AEntry(Value* v,int b,int t, std::vector<Value*> dim,std::vector<vector<int> > data):ptr(v),BType(b),ValType(t)
 	{
 		dims.clear();
 		std::cout<<"Init a AEntry!"<<std::endl;
@@ -35,6 +40,29 @@ struct AEntry
 		{
 			std::cout<<"i: "<<i<<std::endl;
 			dims.push_back(dim[i]);
+		}
+		int Len = data.size();
+		for(int i=0;i<Len;i++)
+		{
+			idata.push_back(data[i]);
+		}
+		std::cout<<"Init Finish!"<<std::endl;
+	};
+	AEntry(Value* v,int b,int t, std::vector<Value*> dim,std::vector<vector <float> > data):ptr(v),BType(b),ValType(t)
+	{
+		dims.clear();
+		std::cout<<"Init a AEntry!"<<std::endl;
+		int L = dim.size();
+		std::cout<<"L: "<<L<<std::endl;
+		for(int i=0;i<L;i++)
+		{
+			std::cout<<"i: "<<i<<std::endl;
+			dims.push_back(dim[i]);
+		}
+		int Len = data.size();
+		for(int i=0;i<Len;i++)
+		{
+			fdata.push_back(data[i]);
 		}
 		std::cout<<"Init Finish!"<<std::endl;
 	};

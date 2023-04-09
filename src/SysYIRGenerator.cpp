@@ -5,7 +5,110 @@
 using namespace std;
 #include "SysYIRGenerator.h"
 
+
+
+
+
+
 namespace sysy {
+
+void AssignArray(vector<vector<Value*> >Values,vector<int>Dims,int dim)
+{
+	if(dim==Dims.size())
+	{
+		int exist = Values.size();
+		if(exist<Dims[dim-1])
+		{
+			int number = Dims[dim-1];
+			for(int i=exist;i<=number;i++)
+			{
+				auto zero = ConstantValue::get(0,"0");
+				vector<Value*> v;
+				v.push_back((Value*)zero);
+				Values.push_back(v);
+			}
+		}
+	}
+	else
+	{
+		int L = Dims[dim-1];
+		for(int i=0;i<L;i++)
+		{
+			AssignArray((vector<vector<Value*> >)Values[i],Dims,dim+1);
+		}
+	}
+}
+
+any getInitValues(vector<vector<Value*> >Values,vector<int>Dims,int dim,int flag)
+{
+	if(dim==Dims.size())
+	{
+		int exist = Values.size();
+		vector <int> InitValue;
+		vector <float> InitValue2;
+		for(int i=0;i<exist;i++)
+		{
+			if(flag==0)
+			{
+				auto *v = module->getInteger(Values[i]->name);
+				InitValue.push_back(*v);
+				
+			}
+			else if(flag==1)
+			{
+				auto *v = module->getFloat(Values[i]->name);
+				InitValue2.push_back(*v);
+			}
+			
+		}
+		if(exist<Dims[dim-1])
+		{
+			int number = Dims[dim-1];
+			for(int i=exist;i<=number;i++)
+			{
+				if(flag==0)
+				{
+				
+					InitValue.push_back(0);
+					return InitValue;
+				
+				}
+				else if(flag==1)
+				{
+				
+					InitValue2.push_back(0);
+					return InitValue2;
+				}
+			}
+		}
+	}
+	else
+	{
+		vector <vector<int> > InitValue;
+		vector <vector<float> > InitValue2;
+		int L = Dims[dim-1];
+		for(int i=0;i<L;i++)
+		{
+			if(flag==0)
+			{
+				auto res = any_cast<vector<int> >(AssignArray(Values[i],Dims,dim+1));
+				InitValue.push_back(res);
+				return InitValue;
+			}
+			else if(flag==1)
+			{
+				auto res = any_cast<vector<float> >(AssignArray(Values[i],Dims,dim+1));
+				InitValue2.push_back(res);
+				return InitValue2;
+			}
+			
+		}
+	}
+	return nullptr;
+	
+}
+
+
 
 any SysYIRGenerator::visitCompUnit(SysYParser::CompUnitContext *ctx)
 {
@@ -55,30 +158,91 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 	{
 		auto name = constdef->Identifier()->getText();
 		vector <Value *> dims;
+		vector <vector<int> > idata;
+		vector <vector<float> > fdata;
 		if(!constdef->constExp().empty())
 		{
+			Dims.clear();
 			for(auto constexp:constdef->constExp())
 			{
 				auto dim = any_cast<Value*>(visitConstExp(constexp));
+				auto * dimp = module->getInteger(dim->name);
+				if(dimp!=nullptr)
+				{
+					Dims.push_back(*dimp);
+				}
 				if(dim->isInt())
 					cout<<"dim is Int"<<endl;
 				dims.push_back(dim);
 			
 			}
 			auto alloca = builder.createAllocaInst(type,dims,name);
-			DimNum = dims.size();
+			//DimNum = dims.size();
 			if(constdef->Assign())
 			{
-				auto value = any_cast<std::vector<Value*>>(visitConstInitVal(constdef->constInitVal()));
-				
+				auto value = any_cast<vector<vector<Value*> > >(visitConstInitVal(constdef->constInitVal()));
+				AssignArray(value,Dims,1);
+				if(type->isInt())
+				{
+					idata = any_cast<vector <vector<int> > >(getInitValue(value,Dims,1,0));
+				}
+				else if(type->isFloat())
+				{
+					fdata = any_cast<vector <vector<float> > >(getInitValue(value,Dims,1,1));
+				}
+					
+				/*if(type->isInt())
+				{
+					int length = value.size();
+					for(int i=0;i<length;i++)
+					{
+						auto v = module->getInteger(value[i]->name);
+						if(v==nullptr)
+						{
+							cout<<"Const Array has non-constant initial value!!!!"<<endl;
+							exit(-1);
+						}
+						idata.push_back(*v);
+						
+					}
+				}
+				if(type->isFloat())
+				{
+					int length = value.size();
+					for(int i=0;i<length;i++)
+					{
+						auto v = module->getFloat(value[i]->name);
+						if(v==nullptr)
+						{
+							cout<<"Const Array has non-constant initial value!!!!"<<endl;
+							exit(-1);
+						}
+						fdata.push_back(*v);
+						
+					}
+				}*/
 				//Init List???
 				auto store = builder.createStoreInst(value,alloca);
 				
 			}
 			cout<<"Put constant array into aryt"<<endl;
 			values.push_back(alloca);
-			AEntry entry(alloca,0,dims);
-			aryt.insert(name,entry);
+			int btype;
+			if(type->isInt())
+			{
+				btype = 0;
+				auto data = idata;
+				AEntry entry(alloca,btype,0,dims,data);
+				aryt.insert(name,entry);
+			}
+			else if(type->isFloat())
+			{
+				btype = 1;
+				auto data = fdata;
+				AEntry entry(alloca,btype,0,dims,data);
+				aryt.insert(name,entry);
+			}
+			
 			cout<<"insert aryt successfully!"<<endl;
 			
 			
@@ -146,20 +310,18 @@ any SysYIRGenerator::visitConstInitVal(SysYParser::ConstInitValContext *ctx)
 	cout<<"visitConstInitVal"<<endl;
 	if(ctx->constExp())
 	{
-		auto constexp = visitConstExp(ctx->constExp());
-		return (constexp);
+		//vector <vector<Value*> > values;
+		auto constexp = any_cast<vector<Value*>>(visitConstExp(ctx->constExp()));
+		//values.push_back(constexp);
+		return constexp;
 	}
 	else
 	{
-		vector <Value*> values;
-		if(ctx->constInitVal().size()==0)
-		{
-			cout<<"constInitValSize: "<<0<<endl;
-		}
+		vector <vector<Value*> > values;
 		for(auto constinit:ctx->constInitVal())
 		{
 			cout<<"constInitValSize: "<<ctx->constInitVal().size()<<endl;
-			auto value = any_cast<Value*>(visitConstInitVal(constinit));
+			auto value = any_cast<vector<Value*>>(visitConstInitVal(constinit));
 			
 			values.push_back(value);
 		}

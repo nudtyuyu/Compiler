@@ -22,10 +22,12 @@ public:
     IDTable idt;
     ArrayTable aryt;
     std::vector<int> Dims;
-    int DimNum;
 
 public:
     SysYIRGenerator() = default;
+public:
+    void AssignArray(std::vector<std::vector<Value*> >Values,std::vector<int>Dims,int dim);
+    std::any getInitValues(std::vector<std::vector<Value*> >Values,std::vector<int>Dims,int dim,int flag);
 
 public:
     virtual std::any visitCompUnit(SysYParser::CompUnitContext *context) override;
