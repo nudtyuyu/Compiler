@@ -45,6 +45,11 @@ Type *Type::getFunctionType(Type *returnType,
   return FunctionType::get(returnType, paramTypes);
 }
 
+Type *Type::getInitListType() {
+  static Type initListType(kInitList);
+  return &initListType;
+}
+
 int Type::getSize() const {
   switch (kind) {
   case kInt:
@@ -56,6 +61,8 @@ int Type::getSize() const {
     return 8;
   case kVoid:
     return 0;
+  case kInitList:
+    return -1;
   }
   return 0;
 }

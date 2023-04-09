@@ -20,7 +20,8 @@ namespace sysy {
 
 struct AEntry
 {
-	Value * ptr;
+	Value *ptr;         ///< 数组首地址
+    Value *value;       ///< 数组值（初值）
 	int ValType; // 0 is constantVal, 1 is varVal
 	//int DataType; //0 is int, 1 is float;
 	std::vector<Value*> dims; // dim info

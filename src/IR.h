@@ -41,6 +41,7 @@ public:
     kLabel,
     kPointer,
     kFunction,
+    kInitList,
   };
   Kind kind;
 
@@ -56,6 +57,7 @@ public:
   static Type *getPointerType(Type *baseType);
   static Type *getFunctionType(Type *returnType,
                                const std::vector<Type *> &paramTypes = {});
+  static Type *getInitListType();
 
 public:
   Kind getKind() const { return kind; }
@@ -65,6 +67,7 @@ public:
   bool isLabel() const { return kind == kLabel; }
   bool isPointer() const { return kind == kPointer; }
   bool isFunction() const { return kind == kFunction; }
+  bool isInitList() const { return kind == kInitList; }
   int getSize() const;
   template <typename T>
   std::enable_if_t<std::is_base_of_v<Type, T>, T *> as() const {
@@ -726,6 +729,18 @@ public:
   Value *getDim(int index) { return getOperand(index); }
 }; // class GlobalValue
 
+// class InitList
+class InitList : public User {
+  friend class Module;
+
+protected:
+  Module *parent;
+
+protected:
+  InitList(Module *module, const std::string &name = ""):
+    User(Type::getInitListType(), name), parent(module) {}
+}; // class InitList
+
 //! IR unit for representing a SysY compile unit
 class Module {
 protected:
@@ -733,6 +748,7 @@ protected:
   std::map<std::string, std::unique_ptr<GlobalValue>> globals;
   std::map<std::string, int> integers;
   std::map<std::string, float> floats;
+  std::map<std::string, std::unique_ptr<InitList>> initLists;
 
 public:
   Module() = default;
@@ -760,6 +776,12 @@ public:
                                  const std::vector<Value *> &dims = {}) {
     auto result =
         globals.try_emplace(name, new GlobalValue(this, type, name, dims));
+    if (not result.second)
+      return nullptr;
+    return result.first->second.get();
+  }
+  InitList *createInitList(const std::string &name) {
+    auto result = initLists.try_emplace(name, new InitList(this, name));
     if (not result.second)
       return nullptr;
     return result.first->second.get();

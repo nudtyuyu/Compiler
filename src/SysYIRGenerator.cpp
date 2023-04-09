@@ -182,7 +182,7 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 		{
 			for(auto constexp:vardef->constExp())
 			{
-			dims.push_back(any_cast<Value*>(visitConstExp(constexp)));
+				dims.push_back(any_cast<Value*>(visitConstExp(constexp)));
 			}
 			auto alloca = builder.createAllocaInst(type,dims,name);
 			if(vardef->Assign())
@@ -261,17 +261,17 @@ any SysYIRGenerator::visitInitVal(SysYParser::InitValContext *ctx)
 	cout<<"visitInitVal"<<endl;
 	if(ctx->exp())
 	{
-		auto constexp = visitExp(ctx->exp());
-		return constexp;
+		auto exp = visitExp(ctx->exp());
+		return exp;
 	}
 	else
 	{
-		vector <Value*> values;
+		auto *initList = module->createInitList("");
 		for(auto initv:ctx->initVal())
 		{
-			values.push_back(any_cast<Value*>(visitInitVal(initv)));
+			initList->addOperand(any_cast<Value*>(visitInitVal(initv)));
 		}
-		return values;
+		return (Value *)initList;
 	}
 	return nullptr;
 }
