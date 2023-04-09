@@ -18,56 +18,51 @@
 
 namespace sysy {
 
-struct AEntry
-{
-	Value * ptr;
-	int BType; // 0 is int, 1 is float
-	int ValType; // 0 is constantVal, 1 is varVal
-	//int DataType; //0 is int, 1 is float;
+class AEntry {
+public:
+	Value *ptr;         ///< 数组首地址
+    InitList *value;    ///< 数组值（类名字叫初值，实际上可不是初值()）
+	// int ValType; // 0 is constantVal, 1 is varVal
+	// //int DataType; //0 is int, 1 is float;
 	std::vector<Value*> dims; // dim info
-	union{
-		std::vector<vector<int> > idata;
-		std::vector<vector<float> >fdata;
-	};
+
+private:
+    bool check(InitList *cur, int depth) const {
+        assert(depth < dims.size());
+        assert(cur->getNumOperands() < dims[depth]);
+        for (auto use : cur->getOperands()) {
+            auto *child = use.getValue();
+            if (child->getType() == Type::getInitListType()) {
+                check(dynamic_cast<InitList *>(child), depth + 1);
+            }
+        }
+    }
+
+public:
 	AEntry() = default;
-	AEntry(Value* v,int b,int t, std::vector<Value*> dim,std::vector<vector<int> > data):ptr(v),BType(b),ValType(t)
+	AEntry(Value *_ptr, InitList* _value, std::vector<Value*> &_dims):ptr(_ptr), value(_value), dims(_dims)
 	{
-		dims.clear();
-		std::cout<<"Init a AEntry!"<<std::endl;
-		int L = dim.size();
-		std::cout<<"L: "<<L<<std::endl;
-		for(int i=0;i<L;i++)
-		{
-			std::cout<<"i: "<<i<<std::endl;
-			dims.push_back(dim[i]);
-		}
-		int Len = data.size();
-		for(int i=0;i<Len;i++)
-		{
-			idata.push_back(data[i]);
-		}
-		std::cout<<"Init Finish!"<<std::endl;
-	};
-	AEntry(Value* v,int b,int t, std::vector<Value*> dim,std::vector<vector <float> > data):ptr(v),BType(b),ValType(t)
-	{
-		dims.clear();
-		std::cout<<"Init a AEntry!"<<std::endl;
-		int L = dim.size();
-		std::cout<<"L: "<<L<<std::endl;
-		for(int i=0;i<L;i++)
-		{
-			std::cout<<"i: "<<i<<std::endl;
-			dims.push_back(dim[i]);
-		}
-		int Len = data.size();
-		for(int i=0;i<Len;i++)
-		{
-			fdata.push_back(data[i]);
-		}
+        // 检查是否越界
+        assert(check(value, 0));
+
+		// dims.clear();
+		// std::cout<<"Init a AEntry!"<<std::endl;
+		// int L = dim.size();
+		// std::cout<<"L: "<<L<<std::endl;
+		// for(int i=0;i<L;i++)
+		// {
+		// 	std::cout<<"i: "<<i<<std::endl;
+		// 	dims.push_back(dim[i]);
+		// }
+		// int Len = data.size();
+		// for(int i=0;i<Len;i++)
+		// {
+		// 	idata.push_back(data[i]);
+		// }
 		std::cout<<"Init Finish!"<<std::endl;
 	};
 	
-};
+}; // class AEntry
 
 class ArrayTable {
 using SubTable2=std::map<std::string, AEntry>;
