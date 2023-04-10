@@ -191,6 +191,8 @@ public:
   bool isInt() const { return type->isInt(); }
   bool isFloat() const { return type->isFloat(); }
   bool isPointer() const { return type->isPointer(); }
+  bool isFunction() const { return type->isFunction(); }
+  bool isInitList() const { return type->isInitList(); }
   const std::list<Use *> &getUses() { return uses; }
   void addUse(Use *use) { uses.push_back(use); }
   void replaceAllUsesWith(Value *value);

@@ -5,8 +5,7 @@
 #include "IRBuilder.h"
 #include "SysYBaseVisitor.h"
 #include "SysYParser.h"
-#include "IDTable.h"
-#include "ArrayTable.h"
+#include "SymTable.h"
 namespace sysy {
 
 class SysYIRGenerator : public SysYBaseVisitor {
@@ -19,8 +18,8 @@ private:
 public:
     bool GlobalVal;
     bool LocalVal;
-    IDTable idt;
-    ArrayTable aryt;
+    SymTable symTable;
+    ArrayTable arrayTable;
     std::vector<int> Dims;
 
 public:
