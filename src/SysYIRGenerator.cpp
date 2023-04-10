@@ -8,31 +8,52 @@ using namespace std;
 
 namespace sysy {
 
-// void AssignArray(vector<vector<Value*> >Values,vector<int>Dims,int dim)
+Value *SysYIRGenerator::getElementPtr(AllocaInst *base, std::vector<Value *> indices) {
+	int ndim = base->getNumDims();
+	assert(ndim == indicies.size());
+	
+	Value *pOffset = builder.createAllocaInst(Type::getPointerType(Type::getIntType()));	///< pointer type
+    builder.createStoreInst(ConstantValue::get(0), pOffset);
+    Value *offset = builder.createLoadInst(pOffset);	///< int type
+
+    offset = builder.createPAddInst(offset, indices[0]);
+    for (int i = 1; i < ndim; ++i) {
+        offset = builder.createPMulInst(base->getDim(i), offset);
+        offset = builder.createAddInst(offset, indices[i]);
+    }
+
+    Value *ptr = builder.createPAddInst(base, offset, "");
+
+	return ptr;
+}
+
+// 这个函数只需要写对局部数组的赋值就可以了，全局的不用
+// 还没想好怎么写
+// void AssignArray(Value *base, vector<Value *> dims, int dim, InitList *values)
 // {
-// 	if(dim==Dims.size())
-// 	{
-// 		int exist = Values.size();
-// 		if(exist<Dims[dim-1])
-// 		{
-// 			int number = Dims[dim-1];
-// 			for(int i=exist;i<=number;i++)
-// 			{
-// 				auto zero = ConstantValue::get(0,"0");
-// 				vector<Value*> v;
-// 				v.push_back((Value*)zero);
-// 				Values.push_back(v);
-// 			}
-// 		}
-// 	}
-// 	else
-// 	{
-// 		int L = Dims[dim-1];
-// 		for(int i=0;i<L;i++)
-// 		{
-// 			AssignArray((vector<vector<Value*> >)Values[i],Dims,dim+1);
-// 		}
-// 	}
+	// if(dim==Dims.size())
+	// {
+	// 	int exist = Values.size();
+	// 	if(exist<Dims[dim-1])
+	// 	{
+	// 		int number = Dims[dim-1];
+	// 		for(int i=exist;i<=number;i++)
+	// 		{
+	// 			auto zero = ConstantValue::get(0,"0");
+	// 			vector<Value*> v;
+	// 			v.push_back((Value*)zero);
+	// 			Values.push_back(v);
+	// 		}
+	// 	}
+	// }
+	// else
+	// {
+	// 	int L = Dims[dim-1];
+	// 	for(int i=0;i<L;i++)
+	// 	{
+	// 		AssignArray((vector<vector<Value*> >)Values[i],Dims,dim+1);
+	// 	}
+	// }
 // }
 
 // any getInitValues(vector<vector<Value*> >Values,vector<int>Dims,int dim,int flag)
@@ -322,8 +343,8 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 {
 	cout<<"visitVarDecl"<<endl;
 	vector <Value*> values;
-	auto type = any_cast<Type*>(visitBType(ctx->bType()));
-	for(auto vardef:ctx->varDef())
+	auto *type = any_cast<Type *>(visitBType(ctx->bType()));
+	for(auto *vardef:ctx->varDef())
 	{
 		auto name = vardef->Identifier()->getText();
 		vector <Value *> dims;
@@ -333,72 +354,41 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 			{
 				dims.push_back(any_cast<Value*>(visitConstExp(constexp)));
 			}
-			auto alloca = builder.createAllocaInst(type,dims,name);
+			auto *alloca = builder.createAllocaInst(type,dims,name);
 			if(vardef->Assign())
 			{
-				auto value = any_cast<Value*>(visitInitVal(vardef->initVal()));
-				//Init List???
-				//auto store = builder.createStoreInst(value,alloca);
+				auto *initVal = any_cast<Value *>(visitInitVal(vardef->initVal()));
+				assert(initVal->getType() == Type::getInitListType());
+				// 这里要调用AssignArray
+				arrayTable.insert(name, AEntry(alloca, dynamic_cast<InitList *>(initVal), dims));
 			}
 			values.push_back(alloca);
-			AEntry entry(alloca,0,dims);
-			arrayTable.insert(name,entry);
-			
 		}
 		else
 		{
 			auto alloca = builder.createAllocaInst(type,{},name);
-			int initV;
-			float initV2;
 			if(vardef->Assign())
 			{
-				auto value = any_cast<Value*>(visitInitVal(vardef->initVal()));
-				cout<<"The Initial Value's Name: "<<value->name<<endl;
-				auto vvi = module->getInteger(value->name);
-				auto vvf = module->getFloat(value->name);
-				if(type->isInt())
-				{
-					cout<<"The Initial Value's value: "<<*vvi<<endl;
-					initV = *vvi;
-				}
-				else if(type->isFloat())
-				{
-					cout<<"The Initial Value's value: "<<*vvf<<endl;
-					initV2 = *vvf;
-				}
+				auto *initVal = any_cast<Value *>(visitInitVal(vardef->initVal()));
+				cout<<"The Initial Value's Name: "<<initVal->name<<endl;
 				cout<<"getVardefAssignInitVal"<<endl;
-				auto store = builder.createStoreInst(value,alloca);
+				auto *store = builder.createStoreInst(initVal, alloca);
 				cout<<"createStoreInst"<<endl;
 			}
 			else
 			{
 				if(type->isInt())
 				{
-					int a = 0;
-					initV  = 0;
-					Value* value = (Value*)ConstantValue::get(a);
-					auto store = builder.createStoreInst(value,alloca);
+					auto *store = builder.createStoreInst(ConstantValue::get(0), alloca);
 				}
 				else if(type->isFloat())
 				{
-					float a = 0.0;
-					initV2  = 0.0;
-					Value* value = (Value*)ConstantValue::get(a);
-					auto store = builder.createStoreInst(value,alloca);
+					auto *store = builder.createStoreInst(ConstantValue::get(0.0f), alloca);
 				}
 			
 			}
 			values.push_back(alloca);
-			if(type->isInt())
-			{
-				Entry entry(alloca,0,initV);
-				symTable.insert(name,entry);
-			}
-			else if(type->isFloat())
-			{
-				Entry entry(alloca,0,initV2);
-				symTable.insert(name,entry);
-			}
+			symTable.insert(name, Entry(alloca));
 		}
 		
 	}
@@ -457,7 +447,7 @@ any SysYIRGenerator::visitFuncType(SysYParser::FuncTypeContext *ctx) {
 	else if (ctx->Int())
 		return Type::getIntType();
 	else
-		return Type::getVosymTableype();
+		return Type::getVoidType();
 }
 
 any SysYIRGenerator::visitBlock(SysYParser::BlockContext *ctx) {

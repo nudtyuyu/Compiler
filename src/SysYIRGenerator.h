@@ -27,6 +27,7 @@ public:
 public:
     void AssignArray(std::vector<std::vector<Value*> >Values,std::vector<int>Dims,int dim);
     std::any getInitValues(std::vector<std::vector<Value*> >Values,std::vector<int>Dims,int dim,int flag);
+    Value *getElementPtr(AllocaInst *base, std::vector<Value *> indices);
 
 public:
     virtual std::any visitCompUnit(SysYParser::CompUnitContext *context) override;
