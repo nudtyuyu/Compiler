@@ -2,6 +2,7 @@
  * @file SymTable.h
  * @brief 符号表的声明。定义见SymTable.cpp
  */
+#include <cassert>
 #include <iostream>
 #include <map>
 #include <string>
@@ -14,7 +15,7 @@ namespace sysy {
 
 class Entry {
 public:
-	Value *value;       ///< 若为变量，保存pointer；若为常量，保存值。
+	Value *value;       ///< 若为变量，保存pointer；若为常量，保存值；若为函数，保存Function*。
 	bool isConst;       ///< 0为变量，1为常量。
 	Entry(Value *_value):value(_value) {
         isConst = !(value->isPointer());
@@ -50,11 +51,11 @@ public:
 
 class AEntry {
 public:
-	Value *ptr;         ///< 数组首地址
-    InitList *value;    ///< 数组值（类名字叫初值，实际上可不是初值()）
+	Value *base;            ///< 数组首地址
+    InitList *value;        ///< 数组值（类名字叫初值，实际上可不是初值()）
 	// int ValType; // 0 is constantVal, 1 is varVal
 	// //int DataType; //0 is int, 1 is float;
-	std::vector<Value*> dims; // dim info
+	std::vector<int> dims; // dim info
 
 private:
     void check(InitList *cur, int depth) const {
@@ -70,7 +71,7 @@ private:
 
 public:
 	AEntry() = default;
-	AEntry(Value *_ptr, InitList* _value, std::vector<Value*> &_dims):ptr(_ptr), value(_value), dims(_dims)
+	AEntry(Value *_base, InitList* _value, std::vector<int> &_dims):base(_base), value(_value), dims(_dims)
 	{
         // 检查是否越界
         check(value, 0);
@@ -89,6 +90,17 @@ public:
 		// {
 		// 	idata.push_back(data[i]);
 		// }
+		std::cout<<"Init Finish!"<<std::endl;
+	};
+    AEntry(Value *_base, InitList* _value, std::vector<Value *> &_dims):base(_base), value(_value)
+	{
+        // 检查是否越界
+        for (auto *index : _dims) {
+            auto *value = dynamic_cast<ConstantValue *>(index);
+            assert(value != nullptr);
+            dims.push_back(value->getInt());
+        }
+        check(value, 0);
 		std::cout<<"Init Finish!"<<std::endl;
 	};
 }; // class AEntry

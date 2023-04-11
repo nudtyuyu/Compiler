@@ -138,6 +138,20 @@ void User::replaceOperand(int index, Value *value) {
   use.setValue(value);
 }
 
+Value * InitList::getElement(const std::vector<int> &indices) {
+  auto *pList = this;
+  for (auto index : indices) {
+    auto *tmp = pList->getOperand(index);
+    if (tmp->getType() == Type::getInitListType()) {
+      pList = dynamic_cast<InitList *>(tmp);
+    } else {
+      return tmp;
+    }
+  }
+
+  return nullptr;
+}
+
 CallInst::CallInst(Function *callee, const std::vector<Value *> args,
                           BasicBlock *parent, const std::string &name)
     : Instruction(kCall, callee->getReturnType(), parent, name) {

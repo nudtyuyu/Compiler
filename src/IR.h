@@ -741,6 +741,9 @@ protected:
 protected:
   InitList(Module *module, const std::string &name = ""):
     User(Type::getInitListType(), name), parent(module) {}
+
+public:
+  Value *getElement(const std::vector<int> &indices);
 }; // class InitList
 
 //! IR unit for representing a SysY compile unit

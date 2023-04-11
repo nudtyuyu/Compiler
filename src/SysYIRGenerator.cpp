@@ -1,5 +1,6 @@
 #include <iostream>
 #include <memory>
+#include <utility>
 #include <vector>
 #include <cstdio>
 #include "SysYIRGenerator.h"
@@ -564,63 +565,62 @@ any SysYIRGenerator::visitCond(SysYParser::CondContext* ctx)
 
 any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx) {
     auto name = ctx->Identifier()->getText();
-    std::string Name = name;
     vector<Value *> exps;
-    //vector<int> dimv;
     bool constflag = true;
-    auto *entry = symTable.query(name);
-    auto *entry2 = arrayTable.query(name);
-    //assert(entry != nullptr);
-    assert(!(entry==nullptr && entry2==nullptr));
-    auto *ident = (entry!=nullptr)?entry->ptr:entry2->ptr;
-    assert(ident != nullptr);
     cout << "visitLVal: " << ctx->getText() << endl;
 
     for (auto *exp : ctx->exp()) {
     	auto *e = any_cast<Value *>(visitExp(exp));
-        exps.push_back(e);
-        auto *d = module->getInteger(e->name);
-        if(d!=nullptr)
+        auto *pInteger = module->getInteger(e->name);
+        if(pInteger!=nullptr)
         {
         	char num[50]={0};
-        	snprintf(num,sizeof(num),"%d",*d);
-        	cout<<"num: "<<num<<endl;
-        	Name += ',';
-        	Name += num;
-        	cout<<"Name: "<<Name<<endl;
-        }
-        if(d==nullptr)
-        {
-        	Name +=',';
-        	Name += e->name;
+        	snprintf(num,sizeof(num),"%d",*pInteger);
+			name = name + "[" + num + "]";
+			exps.push_back(ConstantValue::get(*pInteger));
+        } else {
+        	name = name + "[" + e->name + "]";
         	constflag = false;
+        	exps.push_back(e);
+        }   
+    }
+    cout<<"LVal Name: "<<name<<endl;
+
+	if (!ctx->exp().empty()) {
+		// array
+		auto *entry = arrayTable.query(ctx->Identifier()->getText());
+		int ndim = entry->dims.size();
+		Value *pOffset = builder.createAllocaInst(Type::getPointerType(Type::getIntType()));
+		builder.createStoreInst(ConstantValue::get(0), pOffset);
+		Value *offset = builder.createLoadInst(pOffset);
+
+		if (ndim != 0) {
+			offset = builder.createPAddInst(offset, exps[0]);
+		}
+		for (int i = 1; i < ndim; ++i) {
+			offset = builder.createPMulInst(ConstantValue::get(entry->dims[i]), offset);
+			offset = builder.createPAddInst(offset, exps[i]);
+		}
+
+        Value *ptr = builder.createPAddInst(entry->base, offset, ctx->getText());
+        if (constflag) {
+            vector<int> indices;
+            for (auto *index : exps) {
+                indices.push_back(dynamic_cast<ConstantValue *>(index)->getInt());
+            }
+            auto *value = entry->value->getElement(indices);
+            return make_pair(ptr, value);
+        } else {
+            return make_pair(ptr, (Value *)nullptr);
         }
-        
-        
+    } else {
+        auto *entry = symTable.query(ctx->Identifier()->getText());
+        if (entry->isConst) {
+            return make_pair(nullptr, entry->value);
+        } else {
+            return make_pair(entry->value, nullptr);
+        }
     }
-    if(constflag==false)
-    {
-    	Name = "0"+Name;
-    }
-    cout<<"LVal Name: "<<Name<<endl;
-
-    auto *base = dynamic_cast<AllocaInst *>(ident);
-    assert(base != nullptr);
-    int ndim = base->getNumDims();
-    Value *pOffset = builder.createAllocaInst(Type::getPointerType(Type::getIntType()));
-    builder.createStoreInst(ConstantValue::get(0), pOffset);
-    Value *offset = builder.createLoadInst(pOffset);
-
-    if (ndim != 0) {
-        offset = builder.createPAddInst(offset, exps[0]);
-    }
-    for (int i = 1; i < ndim; ++i) {
-        offset = builder.createPMulInst(base->getDim(i), offset);
-        offset = builder.createPAddInst(offset, exps[i]);
-    }
-
-    Value *ptr = builder.createPAddInst(base, offset,Name);
-    return ptr;
 }
 
 any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
