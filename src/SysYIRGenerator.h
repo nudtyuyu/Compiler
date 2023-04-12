@@ -66,6 +66,13 @@ public:
 
     virtual std::any visitCond(SysYParser::CondContext *context) override;
 
+    /**
+     * @brief 
+     * @param context 
+     * @return  std::any -> std::pair<Value *ptr, Value *val>.
+     *          若为常量, ptr为nullptr, val为ConstantValue*;
+     *          若为变量, ptr为指针值, val为变量值.
+     */
     virtual std::any visitLVal(SysYParser::LValContext *context) override;
 
     virtual std::any visitPrimaryExp(SysYParser::PrimaryExpContext *context) override;
