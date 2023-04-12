@@ -467,21 +467,22 @@ any SysYIRGenerator::visitBlockItem(SysYParser::BlockItemContext *ctx) {
 any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx) {
     Value *ret = nullptr;
     if (ctx->lVal() != nullptr) {
-        Value *ptr = any_cast<Value *>(visitLVal(ctx->lVal()));
+        auto lval = any_cast<pair<Value *, Value *>>(visitLVal(ctx->lVal()));
+		assert(lval.first != nullptr);
         Value *exp = any_cast<Value *>(visitExp(ctx->exp()));
-        ret = builder.createStoreInst(exp, ptr);
+        ret = builder.createStoreInst(exp, lval.first);
     } else if (ctx->Return() != nullptr) {
         Value *value = nullptr;
         if (ctx->exp() != nullptr)
             value = any_cast<Value *>(visitExp(ctx->exp()));
         ret = builder.createReturnInst(value);
     } else if (ctx->If() != nullptr) {
-        auto *block = builder.getBasicBlock();   ///< 当前所在基本块
-        auto *func = block->getParent();         ///< 当前所在函数
-        auto *thenBlock = func->addBasicBlock(); ///< then分支基本块
-        BasicBlock *elseBlock = nullptr;         ///< else分支基本块（可能没有）
-        auto *exitBlock = func->addBasicBlock(); ///< if-then-else结束后的部分
-        std::vector<Value *> thenArgs, elseArgs; ///< then/else基本块的实参列表，暂时用不上，留空即可
+        auto *block = builder.getBasicBlock();   	///< 当前所在基本块
+        auto *func = block->getParent();         	///< 当前所在函数
+        auto *thenBlock = func->addBasicBlock(); 	///< then分支基本块
+        BasicBlock *elseBlock = nullptr;         	///< else分支基本块（可能没有）
+        auto *exitBlock = func->addBasicBlock(); 	///< if-then-else结束后的部分
+        std::vector<Value *> thenArgs, elseArgs; 	///< then/else基本块的实参列表，暂时用不上，留空即可
         auto *cond = any_cast<Value *>(visitCond(ctx->cond()));
 
         // translate thenblock
