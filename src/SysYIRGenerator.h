@@ -21,6 +21,8 @@ public:
     SymTable symTable;
     ArrayTable arrayTable;
     std::vector<int> Dims;
+    int ConstInitListName;
+    int InitListName;
 
 public:
     SysYIRGenerator() = default;

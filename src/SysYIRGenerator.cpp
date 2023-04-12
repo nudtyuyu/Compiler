@@ -134,6 +134,8 @@ any SysYIRGenerator::visitCompUnit(SysYParser::CompUnitContext *ctx)
 	auto Unit = new Module;
 	assert(Unit);
 	module.reset(Unit);
+	ConstInitListName = 0;
+	InitListName = 0;
 	// Decl: createGlobal value
 	symTable.newTable();
 	arrayTable.newTable();
@@ -201,7 +203,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 				auto *initVal = any_cast<Value *>(visitConstInitVal(constdef->constInitVal()));
 				if (initVal->isInitList()) {
 					// array
-					arrayTable.insert(name, AEntry(alloca, dynamic_cast<InitList *>(initVal), dims));
+					arrayTable.insert(name, AEntry(alloca, dynamic_cast<InitList *>(initVal), dims,true));
 				} else {
 					// idata = any_cast<vector <vector<int> > >(getInitValue(value,Dims,1,0));
 					symTable.insert(name, Entry(alloca));
@@ -327,12 +329,26 @@ any SysYIRGenerator::visitConstInitVal(SysYParser::ConstInitValContext *ctx)
 	}
 	else
 	{
-		auto *values = module->createInitList("");
+		char Name[40];
+		sprintf(Name,"ConstInitList%d",ConstInitListName);
+		auto *values = module->createInitList(Name);
+		ConstInitListName+=1;
 		cout<<"constInitValSize: "<<ctx->constInitVal().size()<<endl;
 		for(auto constinit:ctx->constInitVal())
 		{
 			auto *value = any_cast<Value *>(visitConstInitVal(constinit));
+			if(value==nullptr)
+			{
+				cout<<"constinitval is nullptr!!"<<endl;
+				exit(0);
+			}
+			if(values==nullptr)
+			{
+				cout<<"initList==nullptr!"<<endl;
+				exit(0);
+			}
 			values->addOperand(value);
+			cout<<"I have addOperand"<<endl;
 		}
 		return (Value *)values;
 	}
@@ -361,7 +377,7 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 				auto *initVal = any_cast<Value *>(visitInitVal(vardef->initVal()));
 				assert(initVal->getType() == Type::getInitListType());
 				// 这里要调用AssignArray
-				arrayTable.insert(name, AEntry(alloca, dynamic_cast<InitList *>(initVal), dims));
+				arrayTable.insert(name, AEntry(alloca, dynamic_cast<InitList *>(initVal), dims ,false));
 			}
 			values.push_back(alloca);
 		}
@@ -406,10 +422,19 @@ any SysYIRGenerator::visitInitVal(SysYParser::InitValContext *ctx)
 	}
 	else
 	{
-		auto *initList = module->createInitList("");
+		char Name[40];
+		sprintf(Name,"InitList%d",InitListName);
+		auto *initList = module->createInitList(Name);
+		InitListName++;
 		for(auto initv:ctx->initVal())
 		{
-			initList->addOperand(any_cast<Value*>(visitInitVal(initv)));
+			auto *initval = any_cast<Value*>(visitInitVal(initv));
+			if(initval==nullptr)
+			{
+				cout<<"initval is nullptr!!"<<endl;
+				exit(0);
+			}
+			initList->addOperand(initval);
 		}
 		return (Value *)initList;
 	}
@@ -603,7 +628,7 @@ any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx) {
 			offset = builder.createPAddInst(offset, exps[i]);
 		}
 
-        Value *ptr = builder.createPAddInst(entry->base, offset, ctx->getText());
+        Value *ptr = builder.createPAddInst(entry->base, offset, name);
         if (constflag) {
             vector<int> indices;
             for (auto *index : exps) {
@@ -615,7 +640,7 @@ any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx) {
             return make_pair(ptr, (Value *)nullptr);
         }
     } else {
-        auto *entry = symTable.query(ctx->Identifier()->getText());
+        auto *entry = symTable.query(name);
         if (entry->isConst) {
             return make_pair(nullptr, entry->value);
         } else {
@@ -634,46 +659,58 @@ any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
 	else if(ctx->lVal())
 	{
 		cout<<"getLVal"<<endl;
-		auto addr = any_cast<Value*>(visitLVal(ctx->lVal()));//waiting
-		cout<<"get addr: "<<endl;
+		auto addr = any_cast<pair<Value*,Value*>>(visitLVal(ctx->lVal()));//waiting
+		cout<<"get addr"<<endl;
 		symTable.view();
-		auto name = addr->name;
+		arrayTable.view();
+		auto name = addr.first->name;
 		cout<<"the addr name: "<<name<<endl;
 		auto *ptr = symTable.query(name);
-		int index = name.find(",",0);
-		cout<<"index of comma: "<<index<<endl;
-		AEntry *ptr2;
-		if(ptr==nullptr && name.substr(0,1)!="0")
+		int index = name.find("[",0);
+		cout<<"index of bracket: "<<index<<endl;
+		AEntry *ptr2=nullptr;
+		if(ptr==nullptr)
 		{
-			cout<<"query ptr2! 000"<<endl;
+			cout<<"query ptr2!"<<endl;
 			cout<<"name.substr: "<<name.substr(0,index)<<endl;
 			ptr2 = arrayTable.query(name.substr(0,index));
 			
 		}
-		else
+		/*else
 		{
 			cout<<"query ptr2! 111"<<endl;
-			ptr2 = arrayTable.query(name.substr(1,index));
-		}
+			ptr2 = arrayTable.query(name.substr(0,index));
+		}*/
 		//auto *found = module->getInteger(name);
 		if(ptr!=nullptr)
 		{
 			
-			int Var = ptr->ValType;
-			auto *ident = dynamic_cast<PointerType*>(ptr->ptr->getType());
+			int Var = ptr->isConst;
+			auto *ident = dynamic_cast<PointerType*>(ptr->value->getType());
 			auto *identType = ident->getBaseType();
 			cout<<"ValType: "<<Var<<endl;
-			if(Var==0)
+			if(Var==1)
 			{
 				if(identType->isInt())
 				{
 					cout<<"add const val to module integer!"<<endl;
-					module->createInteger(name,ptr->iValue);
+					auto v = dynamic_cast<ConstantValue*>(addr.second);
+					if(v!=nullptr)
+					{
+						int value = v->getInt();
+						module->createInteger(name,value);
+					}
+					
 				}
 				else if(identType->isFloat())
 				{
 					cout<<"add const val to module float!"<<endl;
-					module->createFloat(name,ptr->fValue);
+					auto v = dynamic_cast<ConstantValue*>(addr.second);
+					if(v!=nullptr)
+					{
+						float value = v->getFloat();
+						module->createFloat(name,value);
+					}
 				}
 			}
 		}
@@ -682,31 +719,41 @@ any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
 			/// Here!!!Big Question!!! How to get the value!!!
 			/// The constant value of every element!!!
 			cout<<"ptr2!!!!"<<endl;
-			int Var = ptr->ValType;
-			auto *ident = dynamic_cast<PointerType*>(ptr->ptr->getType());
+			int Var = ptr2->isConst;
+			auto *ident = dynamic_cast<PointerType*>(ptr2->value->getType());
 			auto *identType = ident->getBaseType();
 			cout<<"ValType: "<<Var<<endl;
-			if(Var==0 && name.substr(0,1)!="0")
+			if(Var==1)
 			{
 				if(identType->isInt())
 				{
 					cout<<"add const val to module integer!"<<endl;
-					module->createInteger(name,ptr->iValue);
+					auto v = dynamic_cast<ConstantValue*>(addr.second);
+					if(v!=nullptr)
+					{
+						int value =v->getInt();
+						module->createInteger(name,value);
+					}
 				}
 				else if(identType->isFloat())
 				{
 					cout<<"add const val to module float!"<<endl;
-					module->createFloat(name,ptr->fValue);
+					auto v = dynamic_cast<ConstantValue*>(addr.second);
+					if(v!=nullptr)
+					{
+						float value = v->getFloat();
+						module->createFloat(name,value);
+					}
 				}
 			}
-		}
-		if(ptr2!=nullptr && name.substr(0,1)=="0")
-			name = name.substr(1,name.length());
-		auto value = builder.createLoadInst(addr,{},name);
+		/*if(ptr2!=nullptr && name.substr(0,1)=="0")
+			name = name.substr(1,name.length());*/
+		auto value = builder.createLoadInst(addr.second,{},name);
 		cout<<"load value"<<endl;
 		//symTable.view();
 		return (Value *)value;
 		//cout<<"This is LVal, waiting to edit"<<endl;
+		}
 	}
 	else if(ctx->number())
 	{

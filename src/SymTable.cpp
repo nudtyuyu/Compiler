@@ -96,7 +96,7 @@ void ArrayTable::view() const {
         std::cout << "\n+---------------+---------------+\n";
         for (auto &pair : *pSubTable) {
             std::cout << "|" << std::setw(15) << pair.first;
-            std::cout << "|" << std::setw(15) << std::hex << std::showbase << (unsigned long long)pair.second.ptr << "|\n";
+            std::cout << "|" << std::setw(15) << std::hex << std::showbase << (unsigned long long)pair.second.value << "|\n";
         }
         std::cout.unsetf(std::cout.flags());
         std::cout << "+---------------+---------------+\n";

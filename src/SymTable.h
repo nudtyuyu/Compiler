@@ -17,6 +17,7 @@ class Entry {
 public:
 	Value *value;       ///< 若为变量，保存pointer；若为常量，保存值；若为函数，保存Function*。
 	bool isConst;       ///< 0为变量，1为常量。
+	Entry() = default;
 	Entry(Value *_value):value(_value) {
         isConst = !(value->isPointer());
     }
@@ -56,6 +57,7 @@ public:
 	// int ValType; // 0 is constantVal, 1 is varVal
 	// //int DataType; //0 is int, 1 is float;
 	std::vector<int> dims; // dim info
+	bool isConst;       ///< 0为变量，1为常量。
 
 private:
     void check(InitList *cur, int depth) const {
@@ -71,7 +73,7 @@ private:
 
 public:
 	AEntry() = default;
-	AEntry(Value *_base, InitList* _value, std::vector<int> &_dims):base(_base), value(_value), dims(_dims)
+	AEntry(Value *_base, InitList* _value, std::vector<int> &_dims,bool _isConst):base(_base), value(_value), dims(_dims),isConst(_isConst)
 	{
         // 检查是否越界
         check(value, 0);
@@ -92,7 +94,7 @@ public:
 		// }
 		std::cout<<"Init Finish!"<<std::endl;
 	};
-    AEntry(Value *_base, InitList* _value, std::vector<Value *> &_dims):base(_base), value(_value)
+    AEntry(Value *_base, InitList* _value, std::vector<Value *> &_dims,bool _isConst):base(_base), value(_value),isConst(_isConst)
 	{
         // 检查是否越界
         for (auto *index : _dims) {
