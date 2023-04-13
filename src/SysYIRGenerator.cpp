@@ -14,23 +14,23 @@ Value *SysYIRGenerator::getElementPtr(AllocaInst *base, std::vector<Value *> ind
 	assert(ndim == indicies.size());
 	
 	Value *pOffset = builder.createAllocaInst(Type::getPointerType(Type::getIntType()));	///< pointer type
-    builder.createStoreInst(ConstantValue::get(0), pOffset);
-    Value *offset = builder.createLoadInst(pOffset);	///< int type
+	builder.createStoreInst(ConstantValue::get(0), pOffset);
+	Value *offset = builder.createLoadInst(pOffset);	///< int type
 
-    offset = builder.createPAddInst(offset, indices[0]);
-    for (int i = 1; i < ndim; ++i) {
-        offset = builder.createPMulInst(base->getDim(i), offset);
-        offset = builder.createAddInst(offset, indices[i]);
-    }
+	offset = builder.createPAddInst(offset, indices[0]);
+	for (int i = 1; i < ndim; ++i) {
+		offset = builder.createPMulInst(base->getDim(i), offset);
+		offset = builder.createAddInst(offset, indices[i]);
+	}
 
-    Value *ptr = builder.createPAddInst(base, offset, "");
+	Value *ptr = builder.createPAddInst(base, offset, "");
 
 	return ptr;
 }
 
 // 这个函数只需要写对局部数组的赋值就可以了，全局的不用
 // 还没想好怎么写
-// void AssignArray(Value *base, vector<Value *> dims, int dim, InitList *values)
+// void AssignArray(Value *base, vector<int> dims, int dim, InitList *values)
 // {
 	// if(dim==Dims.size())
 	// {
@@ -490,91 +490,91 @@ any SysYIRGenerator::visitBlockItem(SysYParser::BlockItemContext *ctx) {
 }
 
 any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx) {
-    Value *ret = nullptr;
-    if (ctx->lVal() != nullptr) {
-        auto lval = any_cast<pair<Value *, Value *>>(visitLVal(ctx->lVal()));
+	Value *ret = nullptr;
+	if (ctx->lVal() != nullptr) {
+		auto lval = any_cast<pair<Value *, Value *>>(visitLVal(ctx->lVal()));
 		assert(lval.first != nullptr);
-        Value *exp = any_cast<Value *>(visitExp(ctx->exp()));
-        ret = builder.createStoreInst(exp, lval.first);
-    } else if (ctx->Return() != nullptr) {
-        Value *value = nullptr;
-        if (ctx->exp() != nullptr)
-            value = any_cast<Value *>(visitExp(ctx->exp()));
-        ret = builder.createReturnInst(value);
-    } else if (ctx->If() != nullptr) {
-        auto *block = builder.getBasicBlock();   	///< 当前所在基本块
-        auto *func = block->getParent();         	///< 当前所在函数
-        auto *thenBlock = func->addBasicBlock(); 	///< then分支基本块
-        BasicBlock *elseBlock = nullptr;         	///< else分支基本块（可能没有）
-        auto *exitBlock = func->addBasicBlock(); 	///< if-then-else结束后的部分
-        std::vector<Value *> thenArgs, elseArgs; 	///< then/else基本块的实参列表，暂时用不上，留空即可
-        auto *cond = any_cast<Value *>(visitCond(ctx->cond()));
+		Value *exp = any_cast<Value *>(visitExp(ctx->exp()));
+		ret = builder.createStoreInst(exp, lval.first);
+	} else if (ctx->Return() != nullptr) {
+		Value *value = nullptr;
+		if (ctx->exp() != nullptr)
+			value = any_cast<Value *>(visitExp(ctx->exp()));
+		ret = builder.createReturnInst(value);
+	} else if (ctx->If() != nullptr) {
+		auto *block = builder.getBasicBlock();   	///< 当前所在基本块
+		auto *func = block->getParent();         	///< 当前所在函数
+		auto *thenBlock = func->addBasicBlock(); 	///< then分支基本块
+		BasicBlock *elseBlock = nullptr;         	///< else分支基本块（可能没有）
+		auto *exitBlock = func->addBasicBlock(); 	///< if-then-else结束后的部分
+		std::vector<Value *> thenArgs, elseArgs; 	///< then/else基本块的实参列表，暂时用不上，留空即可
+		auto *cond = any_cast<Value *>(visitCond(ctx->cond()));
 
-        // translate thenblock
-        block->getSuccessors().push_back(thenBlock);
-        thenBlock->getPredecessors().push_back(block);
-        builder.setPosition(thenBlock, thenBlock->end());
-        visitStmt(ctx->stmt()[0]);
-        builder.setPosition(block, block->end());
+		// translate thenblock
+		block->getSuccessors().push_back(thenBlock);
+		thenBlock->getPredecessors().push_back(block);
+		builder.setPosition(thenBlock, thenBlock->end());
+		visitStmt(ctx->stmt()[0]);
+		builder.setPosition(block, block->end());
 
-        // translate elseblock
-        if (ctx->Else() != nullptr) {
-            elseBlock = func->addBasicBlock();
-            block->getSuccessors().push_back(elseBlock);
-            elseBlock->getPredecessors().push_back(block);
-            builder.setPosition(thenBlock, elseBlock->end());
-            visitStmt(ctx->stmt()[1]);
-            builder.setPosition(block, elseBlock->end());
-        }
+		// translate elseblock
+		if (ctx->Else() != nullptr) {
+			elseBlock = func->addBasicBlock();
+			block->getSuccessors().push_back(elseBlock);
+			elseBlock->getPredecessors().push_back(block);
+			builder.setPosition(thenBlock, elseBlock->end());
+			visitStmt(ctx->stmt()[1]);
+			builder.setPosition(block, elseBlock->end());
+		}
 
-        ret = builder.createCondBrInst(cond, thenBlock, elseBlock, thenArgs, elseArgs);
+		ret = builder.createCondBrInst(cond, thenBlock, elseBlock, thenArgs, elseArgs);
 
-        // prepare to translate exitblock
-        block->getSuccessors().push_back(exitBlock);
-        exitBlock->getPredecessors().push_back(block);
-        builder.setPosition(exitBlock, exitBlock->end());
-    } else if (ctx->While() != nullptr) {
-        auto *block = builder.getBasicBlock();    ///< 当前所在基本块
-        auto *func = block->getParent();          ///< 当前所在函数
-        auto *entryBlock = func->addBasicBlock(); ///< 循环入口，即循环条件计算和判断
-        auto *innerBlock = func->addBasicBlock(); ///< while循环体块
-        auto *exitBlock = func->addBasicBlock();  ///< while循环结束后的部分
-        std::vector<Value *> innerArgs;           ///< 循环体块实参列表，暂时留空
+		// prepare to translate exitblock
+		block->getSuccessors().push_back(exitBlock);
+		exitBlock->getPredecessors().push_back(block);
+		builder.setPosition(exitBlock, exitBlock->end());
+	} else if (ctx->While() != nullptr) {
+		auto *block = builder.getBasicBlock();    ///< 当前所在基本块
+		auto *func = block->getParent();          ///< 当前所在函数
+		auto *entryBlock = func->addBasicBlock(); ///< 循环入口，即循环条件计算和判断
+		auto *innerBlock = func->addBasicBlock(); ///< while循环体块
+		auto *exitBlock = func->addBasicBlock();  ///< while循环结束后的部分
+		std::vector<Value *> innerArgs;           ///< 循环体块实参列表，暂时留空
 
-        block->getSuccessors().push_back(entryBlock);
-        entryBlock->getPredecessors().push_back(block);
-        entryBlock->getSuccessors().push_back(innerBlock);
-        innerBlock->getPredecessors().push_back(entryBlock);
-        entryBlock->getSuccessors().push_back(exitBlock);
-        exitBlock->getPredecessors().push_back(entryBlock);
+		block->getSuccessors().push_back(entryBlock);
+		entryBlock->getPredecessors().push_back(block);
+		entryBlock->getSuccessors().push_back(innerBlock);
+		innerBlock->getPredecessors().push_back(entryBlock);
+		entryBlock->getSuccessors().push_back(exitBlock);
+		exitBlock->getPredecessors().push_back(entryBlock);
 
-        // translate cond/entry block
-        builder.setPosition(entryBlock, entryBlock->end());
-        auto *cond = any_cast<Value *>(visitCond(ctx->cond()));
-        ret = builder.createCondBrInst(cond, innerBlock, nullptr, innerArgs, std::vector<Value *>());
+		// translate cond/entry block
+		builder.setPosition(entryBlock, entryBlock->end());
+		auto *cond = any_cast<Value *>(visitCond(ctx->cond()));
+		ret = builder.createCondBrInst(cond, innerBlock, nullptr, innerArgs, std::vector<Value *>());
 
-        // translate inner block
-        builder.setPosition(innerBlock, innerBlock->end());
-        loopEntry.push_back(entryBlock);
-        loopExit.push_back(exitBlock);
-        visitStmt(ctx->stmt()[0]);
-        loopEntry.pop_back();
-        loopExit.pop_back();
+		// translate inner block
+		builder.setPosition(innerBlock, innerBlock->end());
+		loopEntry.push_back(entryBlock);
+		loopExit.push_back(exitBlock);
+		visitStmt(ctx->stmt()[0]);
+		loopEntry.pop_back();
+		loopExit.pop_back();
 
-        // prepare to translate exitblock
-        builder.setPosition(exitBlock, exitBlock->end());
-    } else if (ctx->Break()) {
-        std::vector<Value *> args; ///< 留空
-        ret = builder.createUncondBrInst(loopExit.back(), args);
-    } else if (ctx->Continue()) {
-        std::vector<Value *> args; ///< 留空
-        ret = builder.createUncondBrInst(loopEntry.back(), args);
-    } else if (ctx->block()) {
-        ret = any_cast<Value *>(visitBlock(ctx->block()));
-    } else if (ctx->exp()) {
-        ret = any_cast<Value *>(visitExp(ctx->exp()));
-    }
-    return ret;
+		// prepare to translate exitblock
+		builder.setPosition(exitBlock, exitBlock->end());
+	} else if (ctx->Break()) {
+		std::vector<Value *> args; ///< 留空
+		ret = builder.createUncondBrInst(loopExit.back(), args);
+	} else if (ctx->Continue()) {
+		std::vector<Value *> args; ///< 留空
+		ret = builder.createUncondBrInst(loopEntry.back(), args);
+	} else if (ctx->block()) {
+		ret = any_cast<Value *>(visitBlock(ctx->block()));
+	} else if (ctx->exp()) {
+		ret = any_cast<Value *>(visitExp(ctx->exp()));
+	}
+	return ret;
 }
 
 any SysYIRGenerator::visitExp(SysYParser::ExpContext *ctx)
@@ -590,27 +590,27 @@ any SysYIRGenerator::visitCond(SysYParser::CondContext* ctx)
 }
 
 any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx) {
-    auto name = ctx->Identifier()->getText();
-    vector<Value *> exps;
-    bool constflag = true;
-    cout << "visitLVal: " << ctx->getText() << endl;
+	auto name = ctx->Identifier()->getText();
+	vector<Value *> exps;
+	bool constflag = true;
+	cout << "visitLVal: " << ctx->getText() << endl;
 
-    for (auto *exp : ctx->exp()) {
-    	auto *e = any_cast<Value *>(visitExp(exp));
-        auto *pInteger = module->getInteger(e->name);
-        if(pInteger!=nullptr)
-        {
-        	char num[50]={0};
-        	snprintf(num,sizeof(num),"%d",*pInteger);
+	for (auto *exp : ctx->exp()) {
+		auto *e = any_cast<Value *>(visitExp(exp));
+		auto *pInteger = module->getInteger(e->name);
+		if(pInteger!=nullptr)
+		{
+			char num[50]={0};
+			snprintf(num,sizeof(num),"%d",*pInteger);
 			name = name + "[" + num + "]";
 			exps.push_back(ConstantValue::get(*pInteger));
-        } else {
-        	name = name + "[" + e->name + "]";
-        	constflag = false;
-        	exps.push_back(e);
-        }   
-    }
-    cout<<"LVal Name: "<<name<<endl;
+		} else {
+			name = name + "[" + e->name + "]";
+			constflag = false;
+			exps.push_back(e);
+		}   
+	}
+	cout<<"LVal Name: "<<name<<endl;
 
 	if (!ctx->exp().empty()) {
 		// array
@@ -628,25 +628,25 @@ any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx) {
 			offset = builder.createPAddInst(offset, exps[i]);
 		}
 
-        Value *ptr = builder.createPAddInst(entry->base, offset, name);
-        if (constflag) {
-            vector<int> indices;
-            for (auto *index : exps) {
-                indices.push_back(dynamic_cast<ConstantValue *>(index)->getInt());
-            }
-            auto *value = entry->value->getElement(indices);
-            return make_pair(ptr, value);
-        } else {
-            return make_pair(ptr, (Value *)nullptr);
-        }
-    } else {
-        auto *entry = symTable.query(name);
-        if (entry->isConst) {
-            return make_pair(nullptr, entry->value);
-        } else {
-            return make_pair(entry->value, nullptr);
-        }
-    }
+		Value *ptr = builder.createPAddInst(entry->base, offset, name);
+		if (constflag && entry->isConst) {
+			vector<int> indices;
+			for (auto *index : exps) {
+				indices.push_back(dynamic_cast<ConstantValue *>(index)->getInt());
+			}
+			auto *value = entry->value->getElement(indices);
+			return make_pair((Value *)nullptr, value);
+		} else {
+			return make_pair(ptr, (Value *)nullptr);
+		}
+	} else {
+		auto *entry = symTable.query(name);
+		if (entry->isConst) {
+			return make_pair((Value *)nullptr, entry->value);
+		} else {
+			return make_pair(entry->value, (Value *)nullptr);
+		}
+	}
 }
 
 any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
@@ -658,24 +658,25 @@ any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
 	}
 	else if(ctx->lVal())
 	{
-		cout<<"getLVal"<<endl;
-		auto addr = any_cast<pair<Value*,Value*>>(visitLVal(ctx->lVal()));//waiting
+		cout<<"get LVal"<<endl;
+		auto lval = any_cast<pair<Value*,Value*>>(visitLVal(ctx->lVal()));//waiting
+		auto *ptr = lval.first;
+		auto *value = lval.second;
 		cout<<"get addr"<<endl;
 		symTable.view();
 		arrayTable.view();
-		auto name = addr.first->name;
-		cout<<"the addr name: "<<name<<endl;
-		auto *ptr = symTable.query(name);
-		int index = name.find("[",0);
-		cout<<"index of bracket: "<<index<<endl;
-		AEntry *ptr2=nullptr;
-		if(ptr==nullptr)
-		{
-			cout<<"query ptr2!"<<endl;
-			cout<<"name.substr: "<<name.substr(0,index)<<endl;
-			ptr2 = arrayTable.query(name.substr(0,index));
-			
-		}
+		auto name = (ptr != nullptr ? ptr->name : value->name);
+		cout<<"the lval's name: "<<name<<endl;
+		// auto *entry = symTable.query(name);
+		// int index = name.find("[",0);
+		// cout<<"index of bracket: "<<index<<endl;
+		// AEntry *ptr2=nullptr;
+		// if(ptr==nullptr)
+		// {
+		// 	cout<<"query ptr2!"<<endl;
+		// 	cout<<"name.substr: "<<name.substr(0,index)<<endl;
+		// 	ptr2 = arrayTable.query(name.substr(0,index));
+		// }
 		/*else
 		{
 			cout<<"query ptr2! 111"<<endl;
@@ -684,76 +685,76 @@ any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
 		//auto *found = module->getInteger(name);
 		if(ptr!=nullptr)
 		{
-			
-			int Var = ptr->isConst;
-			auto *ident = dynamic_cast<PointerType*>(ptr->value->getType());
-			auto *identType = ident->getBaseType();
-			cout<<"ValType: "<<Var<<endl;
-			if(Var==1)
-			{
-				if(identType->isInt())
-				{
-					cout<<"add const val to module integer!"<<endl;
-					auto v = dynamic_cast<ConstantValue*>(addr.second);
-					if(v!=nullptr)
-					{
-						int value = v->getInt();
-						module->createInteger(name,value);
-					}
-					
-				}
-				else if(identType->isFloat())
-				{
-					cout<<"add const val to module float!"<<endl;
-					auto v = dynamic_cast<ConstantValue*>(addr.second);
-					if(v!=nullptr)
-					{
-						float value = v->getFloat();
-						module->createFloat(name,value);
-					}
-				}
-			}
+			// var
+			auto *baseType = dynamic_cast<PointerType *>(ptr->getType())->getBaseType();
+			cout<<"ValType: "<<baseType<<endl;
+			auto *loadValue = builder.createLoadInst(ptr,{},name);
+			cout<<"load value"<<endl;
+			return (Value *)loadValue;
+			// if(baseType->isInt())
+			// {
+			// 	cout<<"add const val to module integer!"<<endl;
+			// 	auto v = dynamic_cast<ConstantValue*>(addr.second);
+			// 	if(v!=nullptr)
+			// 	{
+			// 		int value = v->getInt();
+			// 		module->createInteger(name,value);
+			// 	}
+				
+			// }
+			// else if(identType->isFloat())
+			// {
+			// 	cout<<"add const val to module float!"<<endl;
+			// 	auto v = dynamic_cast<ConstantValue*>(addr.second);
+			// 	if(v!=nullptr)
+			// 	{
+			// 		float value = v->getFloat();
+			// 		module->createFloat(name,value);
+			// 	}
+			// }
 		}
-		else if(ptr2!=nullptr)
+		else
 		{
-			/// Here!!!Big Question!!! How to get the value!!!
-			/// The constant value of every element!!!
-			cout<<"ptr2!!!!"<<endl;
-			int Var = ptr2->isConst;
-			auto *ident = dynamic_cast<PointerType*>(ptr2->value->getType());
-			auto *identType = ident->getBaseType();
-			cout<<"ValType: "<<Var<<endl;
-			if(Var==1)
-			{
-				if(identType->isInt())
-				{
-					cout<<"add const val to module integer!"<<endl;
-					auto v = dynamic_cast<ConstantValue*>(addr.second);
-					if(v!=nullptr)
-					{
-						int value =v->getInt();
-						module->createInteger(name,value);
-					}
-				}
-				else if(identType->isFloat())
-				{
-					cout<<"add const val to module float!"<<endl;
-					auto v = dynamic_cast<ConstantValue*>(addr.second);
-					if(v!=nullptr)
-					{
-						float value = v->getFloat();
-						module->createFloat(name,value);
-					}
-				}
-			}
-		/*if(ptr2!=nullptr && name.substr(0,1)=="0")
-			name = name.substr(1,name.length());*/
-		auto value = builder.createLoadInst(addr.second,{},name);
-		cout<<"load value"<<endl;
-		//symTable.view();
-		return (Value *)value;
-		//cout<<"This is LVal, waiting to edit"<<endl;
+			// const
+			return (Value *)value;
 		}
+		// else if(ptr2!=nullptr)
+		// {
+		// 	/// Here!!!Big Question!!! How to get the value!!!
+		// 	/// The constant value of every element!!!
+		// 	cout<<"ptr2!!!!"<<endl;
+		// 	int Var = ptr2->isConst;
+		// 	auto *ident = dynamic_cast<PointerType*>(ptr2->value->getType());
+		// 	auto *identType = ident->getBaseType();
+		// 	cout<<"ValType: "<<Var<<endl;
+		// 	if(Var==1)
+		// 	{
+		// 		if(identType->isInt())
+		// 		{
+		// 			cout<<"add const val to module integer!"<<endl;
+		// 			auto v = dynamic_cast<ConstantValue*>(addr.second);
+		// 			if(v!=nullptr)
+		// 			{
+		// 				int value =v->getInt();
+		// 				module->createInteger(name,value);
+		// 			}
+		// 		}
+		// 		else if(identType->isFloat())
+		// 		{
+		// 			cout<<"add const val to module float!"<<endl;
+		// 			auto v = dynamic_cast<ConstantValue*>(addr.second);
+		// 			if(v!=nullptr)
+		// 			{
+		// 				float value = v->getFloat();
+		// 				module->createFloat(name,value);
+		// 			}
+		// 		}
+		// 	}
+		//if(ptr2!=nullptr && name.substr(0,1)=="0")
+		//	name = name.substr(1,name.length());
+		//symTable.view();
+		// return (Value *)value;
+		//cout<<"This is LVal, waiting to edit"<<endl;
 	}
 	else if(ctx->number())
 	{
@@ -1534,15 +1535,15 @@ any SysYIRGenerator::visitFunc(SysYParser::FuncContext *ctx) {
   vector<Type *> paramTypes;
   vector<string> paramNames;
   for (auto param : params) {
-    paramTypes.push_back(any_cast<Type *>(visitBtype(param->btype())));
-    paramNames.push_back(param->ID()->getText());
+	paramTypes.push_back(any_cast<Type *>(visitBtype(param->btype())));
+	paramNames.push_back(param->ID()->getText());
   }
   Type *returnType = any_cast<Type *>(visitFuncType(ctx->funcType()));
   auto funcType = Type::getFunctionType(returnType, paramTypes);
   auto function = module->createFunction(name, funcType);
   auto entry = function->getEntryBlock();
   for (auto i = 0; i < paramTypes.size(); ++i)
-    entry->createArgument(paramTypes[i], paramNames[i]);
+	entry->createArgument(paramTypes[i], paramNames[i]);
   builder.setPosition(entry, entry->end());
   visitBlockStmt(ctx->blockStmt());
   return function;
@@ -1553,7 +1554,7 @@ any SysYIRGenerator::visitBtype(SysYParser::BtypeContext *ctx) {
 
 any SysYIRGenerator::visitBlockStmt(SysYParser::BlockStmtContext *ctx) {
   for (auto item : ctx->blockItem())
-    visitBlockItem(item);
+	visitBlockItem(item);
   return builder.getBasicBlock();
 }
 
@@ -1565,13 +1566,13 @@ any SysYIRGenerator::visitDecl(SysYParser::DeclContext *ctx) {
   std::vector<Value *> values;
   auto type = any_cast<Type *>(visitBtype(ctx->btype()));
   for (auto varDef : ctx->varDef()) {
-    auto name = varDef->lValue()->ID()->getText();
-    auto alloca = builder.createAllocaInst(type, {}, name);
-    if (varDef->ASSIGN()) {
-      auto value = any_cast<Value *>(varDef->initValue()->accept(this));
-      auto store = builder.createStoreInst(value, alloca);
-    }
-    values.push_back(alloca);
+	auto name = varDef->lValue()->ID()->getText();
+	auto alloca = builder.createAllocaInst(type, {}, name);
+	if (varDef->ASSIGN()) {
+	  auto value = any_cast<Value *>(varDef->initValue()->accept(this));
+	  auto store = builder.createStoreInst(value, alloca);
+	}
+	values.push_back(alloca);
   }
   return values;
 }*/

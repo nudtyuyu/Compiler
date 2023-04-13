@@ -71,12 +71,19 @@ public:
     /**
      * @brief 
      * @param context 
-     * @return  std::any -> std::pair<Value *ptr, Value *val>.
+     * @return  std::any -> std::pair<Value *ptr, Value *val>
      *          若为常量, ptr为nullptr, val为ConstantValue*;
-     *          若为变量, ptr为指针值, val为变量值.
+     *          若为变量, ptr为指针值, val为nullptr.(不返回变量值是因为涉及到数组元素修改导致值作废的问题)
      */
     virtual std::any visitLVal(SysYParser::LValContext *context) override;
 
+    /**
+     * @brief 
+     * @param context 
+     * @return std::any -> sysy::Value *
+     *         若为变量值，返回基类指针Value *
+     *         若为常量值，返回子类指针ConstantValue *
+     */
     virtual std::any visitPrimaryExp(SysYParser::PrimaryExpContext *context) override;
 
     virtual std::any visitNumber(SysYParser::NumberContext *context) override;
