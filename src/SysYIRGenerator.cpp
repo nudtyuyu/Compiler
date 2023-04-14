@@ -417,7 +417,7 @@ any SysYIRGenerator::visitInitVal(SysYParser::InitValContext *ctx)
 	cout<<"visitInitVal"<<endl;
 	if(ctx->exp())
 	{
-		auto exp = visitExp(ctx->exp());
+		auto exp = any_cast<Value *>(visitExp(ctx->exp()));
 		return exp;
 	}
 	else
@@ -445,14 +445,18 @@ any SysYIRGenerator::visitFuncDef(SysYParser::FuncDefContext *ctx) {
 	Type *retType = any_cast<Type *>(visitFuncType(ctx->funcType()));
 	vector<Type *> paramTypes;
 	vector<string> paramNames;
-	for (auto *fparam : ctx->funcFParams()->funcFParam()) {
-		paramTypes.emplace_back(any_cast<Type *>(visitBType(fparam->bType())));
-		paramNames.emplace_back(fparam->Identifier()->getText());
+	if(ctx->funcFParams())
+	{
+		for (auto *fparam : ctx->funcFParams()->funcFParam()) {
+			paramTypes.emplace_back(any_cast<Type *>(visitBType(fparam->bType())));
+			paramNames.emplace_back(fparam->Identifier()->getText());
+		}
 	}
+	
 	Type *funcType = Type::getFunctionType(retType, paramTypes);
 	auto *function = module->createFunction(ctx->Identifier()->getText(), funcType);
 	auto *entry = function->getEntryBlock();
-	builder.setPosition(entry->end());
+	builder.setPosition(entry,entry->end());
 	symTable.newTable();
 	for (int i = 0; i < paramTypes.size(); ++i) {
 		auto *arg = entry->createArgument(paramTypes[i], paramNames[i]);
@@ -600,17 +604,17 @@ any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx) {
 		auto *pInteger = module->getInteger(e->name);
 		if(pInteger!=nullptr)
 		{
-			char num[50]={0};
+			/*char num[50]={0};
 			snprintf(num,sizeof(num),"%d",*pInteger);
-			name = name + "[" + num + "]";
+			name = name + "[" + num + "]";*/
 			exps.push_back(ConstantValue::get(*pInteger));
 		} else {
-			name = name + "[" + e->name + "]";
+			//name = name + "[" + e->name + "]";
 			constflag = false;
 			exps.push_back(e);
 		}   
 	}
-	cout<<"LVal Name: "<<name<<endl;
+	cout<<"LVal Name: "<<ctx->getText()<<endl;
 
 	if (!ctx->exp().empty()) {
 		// array
@@ -628,7 +632,7 @@ any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx) {
 			offset = builder.createPAddInst(offset, exps[i]);
 		}
 
-		Value *ptr = builder.createPAddInst(entry->base, offset, name);
+		Value *ptr = builder.createPAddInst(entry->base, offset, ctx->getText());
 		if (constflag && entry->isConst) {
 			vector<int> indices;
 			for (auto *index : exps) {
@@ -770,7 +774,7 @@ any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
 
 any SysYIRGenerator::visitNumber(SysYParser::NumberContext *ctx)
 {
-	cout<<"visitNumber"<<endl;
+	cout<<"visitNumber: "<<ctx->getText()<<endl;
 	//return ctx->IntConst() ? Type::getInt() : Type::getFloat();
 	if(ctx->IntConst())
 	{
@@ -1140,7 +1144,7 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 	cout<<"visitAddExp"<<endl;
 	if(Mul_child != nullptr)
 	{
-		auto mul = visitMulExp(ctx->mulExp());
+		auto* mul = any_cast<Value *>(visitMulExp(ctx->mulExp()));
 		cout<<"getaddmul"<<endl;
 		return mul;
 	}
