@@ -184,28 +184,46 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 		vector <vector<float> > fdata;
 		if(!constdef->constExp().empty())
 		{
-			Dims.clear();
+			iDims.clear();
+			
 			for(auto constexp:constdef->constExp())
 			{
 				auto dim = any_cast<Value*>(visitConstExp(constexp));
 				auto * dimp = module->getInteger(dim->name);
 				if(dimp!=nullptr)
 				{
-					Dims.push_back(*dimp);
+					//Dims.push_back(*dimp);
+					if(dim->isInt())
+					{
+						cout<<"dim is Int"<<endl;
+						iDims.push_back(*dimp);
+					}
 				}
-				if(dim->isInt())
-					cout<<"dim is Int"<<endl;
+				
 				dims.push_back(dim);
 			
 			}
 			auto *alloca = builder.createAllocaInst(type,dims,name);
+			if(type->isInt())
+				arrayTable.insert(name,AEntry(alloca,name,iDims,true,true));
+			else if(type->isFloat())
+			{
+				arrayTable.insert(name,AEntry(alloca,name,iDims,true,false));
+			}
+			
 			//DimNum = dims.size();
+			ConstLayer = 0;
+			ConstArrayName = name;
 			if(constdef->Assign())
 			{
 				auto *initVal = any_cast<Value *>(visitConstInitVal(constdef->constInitVal()));
 				if (initVal->isInitList()) {
 					// array
-					arrayTable.insert(name, AEntry(alloca, dynamic_cast<InitList *>(initVal), dims,true));
+					auto *myA = arrayTable.query(name);
+					myA->value = dynamic_cast<InitList *>(initVal);
+					
+						//arrayTable.insert(name, AEntry(alloca, dynamic_cast<InitList *>(initVal), dims,true,true));
+					
 				} else {
 					// idata = any_cast<vector <vector<int> > >(getInitValue(value,Dims,1,0));
 					symTable.insert(name, Entry(alloca));
@@ -321,6 +339,64 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 	return values;
 }
 
+any SysYIRGenerator::GenerateConstZero()
+{
+	cout<<"GenerateConstZero"<<endl;
+	auto *nowArray = arrayTable.query(ConstArrayName);
+	int num = nowArray->dims[ConstLayer+1];
+	bool isInt = nowArray->isInt;
+	int Num_Layer = nowArray->dims.size();
+	if(ConstLayer==Num_Layer-1)
+	{
+		if(isInt)
+		{
+			int z = 0;
+			auto *constzero = (Value*)ConstantValue::get(z);
+			return constzero;
+		}
+		else
+		{
+			float z = 0.0;
+			auto *constzero = (Value*)ConstantValue::get(z);
+			return constzero;
+		}
+		//return constexp;
+		return nullptr;
+	}
+	else
+	{
+		char Name[40];
+		sprintf(Name,"ConstInitName%d",ConstInitListName);
+		auto *values = module->createInitList(Name);
+		ConstInitListName+=1;
+		//cout<<"constInitZeroSize: "<<ctx->constInitVal().size()<<endl;
+		int count=0;
+		
+		for(int i=0;i<num;i++)
+		{
+			ConstLayer++;
+			auto *value = any_cast<Value *>(GenerateConstZero());
+			ConstLayer--;
+			if(value==nullptr)
+			{
+				cout<<"constinitval is nullptr!!"<<endl;
+				exit(0);
+			}
+			if(values==nullptr)
+			{
+				cout<<"initList==nullptr!"<<endl;
+				exit(0);
+			}
+			values->addOperand(value);
+			count++;
+			cout<<"I have addOperandZero"<<endl;
+		}
+		return (Value *)values;
+	}
+	return nullptr;
+	
+}
+
 any SysYIRGenerator::visitConstInitVal(SysYParser::ConstInitValContext *ctx)
 {
 	cout<<"visitConstInitVal"<<endl;
@@ -336,9 +412,12 @@ any SysYIRGenerator::visitConstInitVal(SysYParser::ConstInitValContext *ctx)
 		auto *values = module->createInitList(Name);
 		ConstInitListName+=1;
 		cout<<"constInitValSize: "<<ctx->constInitVal().size()<<endl;
+		int count=0;
 		for(auto constinit:ctx->constInitVal())
 		{
+			ConstLayer++;
 			auto *value = any_cast<Value *>(visitConstInitVal(constinit));
+			ConstLayer--;
 			if(value==nullptr)
 			{
 				cout<<"constinitval is nullptr!!"<<endl;
@@ -350,7 +429,28 @@ any SysYIRGenerator::visitConstInitVal(SysYParser::ConstInitValContext *ctx)
 				exit(0);
 			}
 			values->addOperand(value);
+			count++;
 			cout<<"I have addOperand"<<endl;
+		}
+		auto *nowArray = arrayTable.query(ConstArrayName);
+		int num = nowArray->dims[ConstLayer];
+		bool isInt = nowArray->isInt;
+		for(int i=count;i<=num;i++)
+		{
+			auto *gZero = any_cast<Value*>(GenerateConstZero());
+			values->addOperand(gZero);
+			/*if(isInt)
+			{
+				int z = 0;
+				Value* zero = (Value*)ConstantValue::get(z);
+				values->addOperand(zero);
+			}
+			else
+			{
+				float z = 0.0;
+				Value* zero = (Value*)ConstantValue::get(z);
+				values->addOperand(zero);
+			}*/
 		}
 		return (Value *)values;
 	}
@@ -374,12 +474,25 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 				dims.push_back(any_cast<Value*>(visitConstExp(constexp)));
 			}
 			auto *alloca = builder.createAllocaInst(type,dims,name);
+			if(type->isInt())
+				arrayTable.insert(name,AEntry(alloca,name,dims,false,true));
+			else if(type->isFloat())
+			{
+				arrayTable.insert(name,AEntry(alloca,name,dims,false,false));
+			}
 			if(vardef->Assign())
 			{
+				Layer = 0;
+				ArrayName = name;
 				auto *initVal = any_cast<Value *>(visitInitVal(vardef->initVal()));
 				assert(initVal->getType() == Type::getInitListType());
 				// 这里要调用AssignArray
-				arrayTable.insert(name, AEntry(alloca, dynamic_cast<InitList *>(initVal), dims ,false));
+				auto *myA = arrayTable.query(name);
+				myA->value = dynamic_cast<InitList *>(initVal);
+				/*if(type->isInt())
+					arrayTable.insert(name, AEntry(alloca, dynamic_cast<InitList *>(initVal), dims ,false,true));
+				else if(type->isFloat())
+					arrayTable.insert(name, AEntry(alloca, dynamic_cast<InitList *>(initVal), dims ,false,false));*/
 			}
 			values.push_back(alloca);
 		}
@@ -428,15 +541,39 @@ any SysYIRGenerator::visitInitVal(SysYParser::InitValContext *ctx)
 		sprintf(Name,"InitList%d",InitListName);
 		auto *initList = module->createInitList(Name);
 		InitListName++;
+		int count=0;
 		for(auto initv:ctx->initVal())
 		{
+			Layer++;
 			auto *initval = any_cast<Value*>(visitInitVal(initv));
+			Layer--;
 			if(initval==nullptr)
 			{
 				cout<<"initval is nullptr!!"<<endl;
 				exit(0);
 			}
 			initList->addOperand(initval);
+			count++;
+		}
+		auto *nowArray = arrayTable.query(ArrayName);
+		int num = nowArray->dims[ConstLayer];
+		bool isInt = nowArray->isInt;
+		for(int i=count;i<=num;i++)
+		{
+			/*int inner
+			for(int j=0;j<)
+			if(isInt)
+			{
+				int z = 0;
+				Value* zero = (Value*)ConstantValue::get(z);
+				initList->addOperand(zero);
+			}
+			else
+			{
+				float z = 0.0;
+				Value* zero = (Value*)ConstantValue::get(z);
+				initList->addOperand(zero);
+			}*/
 		}
 		return (Value *)initList;
 	}

@@ -57,7 +57,9 @@ public:
 	// int ValType; // 0 is constantVal, 1 is varVal
 	// //int DataType; //0 is int, 1 is float;
 	std::vector<int> dims; // dim info
+	bool isInt; //0 is float, 1 is int
 	bool isConst;       ///< 0为变量，1为常量。
+	std::string name; //name
 
 private:
     void check(InitList *cur, int depth) const {
@@ -73,7 +75,7 @@ private:
 
 public:
 	AEntry() = default;
-	AEntry(Value *_base, InitList* _value, std::vector<int> &_dims,bool _isConst):base(_base), value(_value), dims(_dims),isConst(_isConst)
+	AEntry(Value *_base, InitList* _value, std::vector<int> &_dims,bool _isConst,bool _isInt,std::string _name):base(_base), value(_value), dims(_dims),isConst(_isConst),isInt(_isInt),name(_name)
 	{
         // 检查是否越界
         check(value, 0);
@@ -94,7 +96,7 @@ public:
 		// }
 		std::cout<<"Init Finish!"<<std::endl;
 	};
-    AEntry(Value *_base, InitList* _value, std::vector<Value *> &_dims,bool _isConst):base(_base), value(_value),isConst(_isConst)
+    AEntry(Value *_base, InitList* _value, std::vector<Value *> &_dims,bool _isConst,bool _isInt,std::string _name):base(_base), value(_value),isConst(_isConst),isInt(_isInt),name(_name)
 	{
         // 检查是否越界
         for (auto *index : _dims) {
@@ -105,6 +107,27 @@ public:
         check(value, 0);
 		std::cout<<"Init Finish!"<<std::endl;
 	};
+    AEntry(Value* _base,std::string _name,std::vector<int> &_dims,bool _isConst,bool _isInt):base(_base),name(_name),isConst(_isConst),isInt(_isInt)
+    {
+    	int length = _dims.size();
+    	dims.clear();
+    	for(int i=0;i<length;i++)
+    	{
+    		dims.push_back(_dims[i]);
+    	}
+    };
+    AEntry(Value* _base,std::string _name,std::vector<Value*> &_dims,bool _isConst,bool _isInt):base(_base),name(_name),isConst(_isConst),isInt(_isInt)
+    {
+    	int length = _dims.size();
+    	dims.clear();
+    	for(int i=0;i<length;i++)
+    	{
+    		auto *value = dynamic_cast<ConstantValue *>(_dims[i]);
+            	assert(value != nullptr);
+            	dims.push_back(value->getInt());
+    	}
+    };
+	
 }; // class AEntry
 
 class ArrayTable {

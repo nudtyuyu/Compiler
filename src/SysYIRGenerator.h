@@ -21,9 +21,13 @@ public:
     bool LocalVal;
     SymTable symTable;
     ArrayTable arrayTable;
-    std::vector<int> Dims;
+    std::vector<int> iDims;
     int ConstInitListName;
     int InitListName;
+    int Layer;// visit initvalue layer for var Array
+    int ConstLayer; //visit initvalue layer for const Array
+    std::string ArrayName;
+    std::string ConstArrayName;
 
 public:
     SysYIRGenerator() = default;
@@ -114,6 +118,7 @@ public:
         builder.getBasicBlock()->generateCode(out);
         module->generateCode(out);
     }
+    std::any GenerateConstZero();
 
 }; // class SysYIRGenerator
 
