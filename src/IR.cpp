@@ -98,6 +98,12 @@ FunctionType *FunctionType::get(Type *returnType,
   return result.first->get();
 }
 
+void Function::generateCode(std::ostream &out) const {
+  for (const auto &block : blocks) {
+    block->generateCode(out);
+  }
+}
+
 void Value::replaceAllUsesWith(Value *value) {
   for (auto &use : uses)
     use->getUser()->setOperand(use->getIndex(), value);
@@ -141,6 +147,8 @@ void User::replaceOperand(int index, Value *value) {
 Value * InitList::getElement(const std::vector<int> &indices) {
   auto *pList = this;
   for (auto index : indices) {
+    if (index >= pList->getNumOperands())
+      return nullptr;
     auto *tmp = pList->getOperand(index);
     if (tmp->getType() == Type::getInitListType()) {
       pList = dynamic_cast<InitList *>(tmp);
@@ -156,12 +164,186 @@ CallInst::CallInst(Function *callee, const std::vector<Value *> args,
                           BasicBlock *parent, const std::string &name)
     : Instruction(kCall, callee->getReturnType(), parent, name) {
   addOperand(callee);
-  for (auto arg : args)
-    addOperand(arg);
+  addOperands(args);
 }
 
-Function *CallInst::getCallee() {
+Function *CallInst::getCallee() const {
   return dynamic_cast<Function *>(getOperand(0));
+}
+
+void CallInst::generateCode(std::ostream &out) const {
+    auto *func = getCallee();
+    out << "  call, " << func->getName();
+    for (auto operand : getArguments())
+      out << ", " << operand.getValue()->name;
+    out << "\n";
+  }
+
+void UnaryInst::generateCode(std::ostream &out) const {
+  out << "  " + getName() << " = ";
+  switch (kind) {
+    case Instruction::kPos :
+    case Instruction::kFPos :
+      out << "+";
+      break;
+    case Instruction::kNeg :
+    case Instruction::kFNeg :
+      out << "-";
+      break;
+    case Instruction::kNot :
+      out << "not";
+      break;
+    case Instruction::kFtoI :
+      out << "ftoi";
+      break;
+    case Instruction::kIToF :
+      out << "itof";
+      break;
+    default:
+      out << "<error unary instruction type>";
+  }
+  out << " " << getOperand() << "\n";
+}
+
+void BinaryInst::generateCode(std::ostream &out) const {
+  out << "  " + getName() << " = " << getLhs()->getName() << " ";
+  switch (kind) {
+    case Instruction::kAdd :
+    case Instruction::kFAdd :
+      out << "+";
+      break;
+    case Instruction::kSub :
+    case Instruction::kFSub :
+      out << "-";
+      break;
+    case Instruction::kMul :
+    case Instruction::kFMul :
+      out << "*";
+      break;
+    case Instruction::kDiv :
+    case Instruction::kFDiv :
+      out << "/";
+      break;
+    case Instruction::kAnd :
+      out << "&&";
+      break;
+    case Instruction::kOr :
+      out << "||";
+      break;
+    case Instruction::kICmpEQ :
+    case Instruction::kFCmpEQ :
+      out << "==";
+      break;
+    case Instruction::kICmpNE :
+    case Instruction::kFCmpNE :
+      out << "!=";
+      break;
+    case Instruction::kICmpLT :
+    case Instruction::kFCmpLT :
+      out << "<";
+      break;
+    case Instruction::kICmpGT :
+    case Instruction::kFCmpGT :
+      out << ">";
+      break;
+    case Instruction::kICmpLE :
+    case Instruction::kFCmpLE :
+      out << "<=";
+      break;
+    case Instruction::kICmpGE :
+    case Instruction::kFCmpGE :
+      out << ">=";
+      break;
+    // Rem 是啥指令
+    default:
+      out << "<error binary instruction type>";
+      break;
+  }
+  out << " " << getRhs()->getName() << "\n";
+}
+
+void ReturnInst::generateCode(std::ostream &out) const  {
+  auto *retVal = this->getReturnValue();
+  if (retVal != nullptr) {
+    out << "  return, " << retVal->getName() << "\n";
+  } else {
+    out << "  return\n";
+  }
+}
+
+void UncondBrInst::generateCode(std::ostream &out) const {
+  auto *target = getOperand(0);
+  auto args = getArguments();
+  out << "  br, " << target->name << "(";
+  for (auto it = args.begin(); it != args.end(); ++it) {
+    out << (it != args.begin() ? ", " : "") << it->getValue()->name;
+  }
+  out << ")\n";
+}
+
+void CondBrInst::generateCode(std::ostream &out) const {
+  auto *condition = getCondition();
+  auto *thenBlock = getThenBlock();
+  auto *elseBlock = getElseBlock();
+  auto thenArgs = getThenArguments();
+  auto elseArgs = getElseArguments();
+  out << "  br, " << getCondition()->name;
+  out << ", " << thenBlock->name << "(";
+  for (auto it = thenArgs.begin(); it != thenArgs.end(); ++it) {
+    out << (it != thenArgs.begin() ? ", " : "") << it->getValue()->name;
+  }
+  out << ")";
+  out << ", " << elseBlock->name << "(";
+  for (auto it = elseArgs.begin(); it != elseArgs.end(); ++it) {
+    out << (it != elseArgs.begin() ? ", " : "") << it->getValue()->name;
+  }
+  out << ")\n";
+}
+
+void AllocaInst::generateCode(std::ostream &out) const {
+  out << "  " + getName() << " = " << "alloca ";
+  if (getType()->isFloat())
+    out << "float";
+  else if (getType()->isInt()) {
+    out << "int";
+  }
+  if (getNumDims() > 0) {
+    out << "[";
+    auto dims = getDims();
+    for (auto it = dims.begin(); it != dims.end(); ++it) {
+      out << (it != dims.begin() ? ", " : "") << it->getValue()->getName();
+    }
+    out << "]";
+  }
+  out << "\n";
+}
+
+void StoreInst::generateCode(std::ostream &out) const {
+  auto *ptr = getPointer();
+  auto *val = getValue();
+  auto indices = getIndices();
+  out << "  store " << ptr->getName() << ", " << val->getName();
+  for (auto index : indices) {
+    out << "[" << index.getValue()->getName() << "]";
+  }
+  out << "\n";
+}
+
+void BasicBlock::generateCode(std::ostream &out) const {
+  out << getName() << "(";
+  for (auto it = arguments.begin(); it != arguments.end(); ++it) {
+    out << (it != arguments.begin() ? ", " : "");
+  }
+  out << "):\n";
+  for (const auto &inst : instructions) {
+    inst->generateCode(out);
+  }
+}
+
+void Module::generateCode(std::ostream &out) const {
+  for (auto &func : functions) {
+    func.second->generateCode(out);
+  }
 }
 
 } // namespace sysy

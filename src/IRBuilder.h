@@ -247,14 +247,6 @@ public:
     block->getInstructions().emplace(position, inst);
     return inst;
   }
-  InitInst *createStoreInst(std::vector<Value *>value, Value *pointer,
-                             const std::vector<Value *> &indices = {},
-                             const std::string &name = "") {
-    auto inst = new InitInst(value, pointer, indices, block, name);
-    assert(inst);
-    block->getInstructions().emplace(position, inst);
-    return inst;
-  }
   
   // for pointer calculation
   BinaryInst *createPAddInst(Value *lhs, Value *rhs,
@@ -272,6 +264,7 @@ public:
     Type *type = (lhs->isPointer() ? lhs->getType() : rhs->getType());
     return createBinaryInst(Instruction::kMul, type, lhs, rhs, name);
   }
+  
 };
 
 } // namespace sysy

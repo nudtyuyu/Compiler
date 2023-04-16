@@ -7,6 +7,7 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <ostream>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -303,6 +304,9 @@ public:
     arguments.emplace_back(type, this, arguments.size(), name);
     return &arguments.back();
   };
+
+public:
+  void generateCode(std::ostream &out) const;
 }; // class BasicBlock
 
 //! User is the abstract base type of `Value` types which use other `Value` as
@@ -358,8 +362,8 @@ public:
     kMul = 0x1UL << 2,
     kDiv = 0x1UL << 3,
     kRem = 0x1UL << 4,
-    kAnd = 0x1UL <<39,
-    kOr  = 0x1UL <<40,
+    kAnd = 0x1UL << 39,
+    kOr  = 0x1UL << 40,
     kICmpEQ = 0x1UL << 5,
     kICmpNE = 0x1UL << 6,
     kICmpLT = 0x1UL << 7,
@@ -380,8 +384,8 @@ public:
     // Unary
     kPos = 0x1UL << 37,
     kNeg = 0x1UL << 25,
-    kNot = 0x1UL << 26,
-    kFPos = 0x1UL <<38,
+    kNot = 0x1UL << 27,
+    kFPos = 0x1UL << 38,
     kFNeg = 0x1UL << 26,
     kFtoI = 0x1UL << 28,
     kIToF = 0x1UL << 29,
@@ -394,10 +398,7 @@ public:
     // mem op
     kAlloca = 0x1UL << 34,
     kLoad = 0x1UL << 35,
-    kStore = 0x1UL << 36,
-    kInit = 0x1UL << 41
-    // constant
-    // kConstant = 0x1UL << 37,
+    kStore = 0x1UL << 36
   };
 
 protected:
@@ -428,7 +429,7 @@ public:
     return kind & UnaryOpMask;
   }
   bool isMemory() const {
-    static constexpr uint64_t MemoryOpMask = kAlloca | kLoad | kStore | kInit;
+    static constexpr uint64_t MemoryOpMask = kAlloca | kLoad | kStore;
     return kind & MemoryOpMask;
   }
   bool isTerminator() const {
@@ -452,6 +453,11 @@ public:
   }
   bool isUnconditional() const { return kind == kBr; }
   bool isConditional() const { return kind == kCondBr; }
+
+public:
+  virtual void generateCode(std::ostream &out) const {
+    return;
+  }
 }; // class Instruction
 
 class Function;
@@ -463,10 +469,13 @@ protected:
   CallInst(Function *callee, const std::vector<Value *> args = {},
            BasicBlock *parent = nullptr, const std::string &name = "");
 public:
-  Function *getCallee();
-  auto getArguments() {
+  Function *getCallee() const;
+  auto getArguments() const {
     return make_range(std::next(operand_begin()), operand_end());
   }
+
+public:
+  void generateCode(std::ostream &out) const override;
 }; // class CallInst
 
 //! Unary instruction, includes '!', '-' and type conversion.
@@ -482,6 +491,9 @@ protected:
 
 public:
   Value *getOperand() const { return User::getOperand(0); }
+
+public:
+  void generateCode(std::ostream &out) const override;
 }; // class UnaryInst
 
 //! Binary instruction, e.g., arithmatic, relation, logic, etc.
@@ -499,6 +511,9 @@ protected:
 public:
   Value *getLhs() const { return getOperand(0); }
   Value *getRhs() const { return getOperand(1); }
+
+public:
+  void generateCode(std::ostream &out) const override;
 }; // class BinaryInst
 
 //! The return statement
@@ -517,6 +532,9 @@ public:
   Value *getReturnValue() const {
     return hasReturnValue() ? getOperand(0) : nullptr;
   }
+
+public:
+  void generateCode(std::ostream &out) const override;
 }; // class ReturnInst
 
 //! Unconditional branch
@@ -539,6 +557,9 @@ public:
   auto getArguments() const {
     return make_range(std::next(operands.begin()), operands.end());
   }
+
+public:
+  void generateCode(std::ostream &out) const override;
 }; // class UncondBrInst
 
 //! Conditional branch
@@ -576,6 +597,12 @@ public:
     auto end = operands.end();
     return make_range(begin, end);
   }
+  auto getCondition() const {
+    return getOperand(0);
+  }
+
+public:
+  void generateCode(std::ostream &out) const override;
 }; // class CondBrInst
 
 //! Allocate memory for stack variables, used for non-global variable declartion
@@ -593,6 +620,9 @@ public:
   int getNumDims() const { return getNumOperands(); }
   auto getDims() const { return getOperands(); }
   Value *getDim(int index) { return getOperand(index); }
+
+public:
+  void generateCode(std::ostream &out) const override;
 }; // class AllocaInst
 
 //! Load a value from memory address specified by a pointer value
@@ -638,35 +668,10 @@ public:
     return make_range(operand_begin() + 2, operand_end());
   }
   Value *getIndex(int index) const { return getOperand(index + 2); }
-}; // class StoreInst
-
-
-//! Initiate the Array
-class InitInst : public Instruction {
-  friend class IRBuilder;
-
-protected:
-  InitInst(std::vector<Value *>value, Value *pointer,
-            const std::vector<Value *> &indices = {},
-            BasicBlock *parent = nullptr, const std::string &name = "")
-      : Instruction(kInit, Type::getVoidType(), parent, name) {
-    addOperands(value);
-    addOperand(pointer);
-    addOperands(indices);
-    valueNum=value.size();
-  }
 
 public:
-  int valueNum;
-  int getNumIndices() const { return getNumOperands() - 1 - valueNum; }
-  auto getValue() const { return make_range(operand_begin(),operand_begin()+valueNum-1); }
-  Value *getPointer() const { return getOperand(valueNum); }
-  auto getIndices() const {
-    return make_range(operand_begin() + valueNum+1, operand_end());
-  }
-  Value *getIndex(int index) const { return getOperand(index + valueNum+1); }
-}; // class InitInst
-
+  void generateCode(std::ostream &out) const override;
+}; // class StoreInst
 
 
 class Module;
@@ -705,6 +710,9 @@ public:
       return block == b.get();
     });
   }
+
+public:
+  void generateCode(std::ostream &out) const;
 }; // class Function
 
 //! Global value declared at file scope
@@ -815,6 +823,9 @@ public:
       return nullptr;
     return result->second.get();
   }
+
+public:
+  void generateCode(std::ostream &out) const;
 }; // class Module
 
 /*!
