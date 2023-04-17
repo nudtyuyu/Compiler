@@ -263,6 +263,12 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 				//Init List???
 				
 			}
+			else
+			{
+				auto *initVal = any_cast<Value *>(GenerateZero(0,name));
+				auto *myA = arrayTable.query(name);
+				myA->value = dynamic_cast<InitList *>(initVal);
+			}
 			// cout<<"Put constant array into arrayTable"<<endl;
 			// values.push_back(alloca);
 			// int btype;
@@ -491,13 +497,19 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 				ArrayName = name;
 				auto *initVal = any_cast<Value *>(visitInitVal(vardef->initVal()));
 				assert(initVal->getType() == Type::getInitListType());
-				// 这里要调用AssignArray
+				// 这里no要调用AssignArray
 				auto *myA = arrayTable.query(name);
 				myA->value = dynamic_cast<InitList *>(initVal);
 				/*if(type->isInt())
 					arrayTable.insert(name, AEntry(alloca, dynamic_cast<InitList *>(initVal), dims ,false,true));
 				else if(type->isFloat())
 					arrayTable.insert(name, AEntry(alloca, dynamic_cast<InitList *>(initVal), dims ,false,false));*/
+			}
+			else
+			{
+				auto *initVal = any_cast<Value *>(GenerateZero(0,name));
+				auto *myA = arrayTable.query(name);
+				myA->value = dynamic_cast<InitList *>(initVal);
 			}
 			values.push_back(alloca);
 		}
