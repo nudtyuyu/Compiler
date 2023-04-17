@@ -118,7 +118,7 @@ public:
         builder.getBasicBlock()->generateCode(out);
         module->generateCode(out);
     }
-    std::any GenerateConstZero();
+    std::any GenerateZero(int Lay,std::string name);
 
 }; // class SysYIRGenerator
 

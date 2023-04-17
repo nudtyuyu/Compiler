@@ -339,14 +339,17 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 	return values;
 }
 
-any SysYIRGenerator::GenerateConstZero()
+any SysYIRGenerator::GenerateZero(int Lay,string name)
 {
-	cout<<"GenerateConstZero"<<endl;
-	auto *nowArray = arrayTable.query(ConstArrayName);
-	int num = nowArray->dims[ConstLayer+1];
-	bool isInt = nowArray->isInt;
+	//cout<<"GenerateConstZero"<<endl;
+	auto *nowArray = arrayTable.query(name);
 	int Num_Layer = nowArray->dims.size();
-	if(ConstLayer==Num_Layer-1)
+	if(Lay>Num_Layer-1)
+		Lay = Num_Layer-1;
+	int num = nowArray->dims[Lay];
+	bool isInt = nowArray->isInt;
+	cout<<"Lay: "<<Lay<<" , Num_Layer-1: "<<Num_Layer-1<<endl;
+	if(Lay>=Num_Layer-1)
 	{
 		if(isInt)
 		{
@@ -370,13 +373,13 @@ any SysYIRGenerator::GenerateConstZero()
 		auto *values = module->createInitList(Name);
 		ConstInitListName+=1;
 		//cout<<"constInitZeroSize: "<<ctx->constInitVal().size()<<endl;
-		int count=0;
+		//int count=0;
 		
 		for(int i=0;i<num;i++)
 		{
-			ConstLayer++;
-			auto *value = any_cast<Value *>(GenerateConstZero());
-			ConstLayer--;
+			//ConstLayer++;
+			auto *value = any_cast<Value *>(GenerateZero(Lay+1,name));
+			//ConstLayer--;
 			if(value==nullptr)
 			{
 				cout<<"constinitval is nullptr!!"<<endl;
@@ -388,8 +391,8 @@ any SysYIRGenerator::GenerateConstZero()
 				exit(0);
 			}
 			values->addOperand(value);
-			count++;
-			cout<<"I have addOperandZero"<<endl;
+			//count++;
+			//cout<<"I have addOperandZero"<<endl;
 		}
 		return (Value *)values;
 	}
@@ -437,7 +440,9 @@ any SysYIRGenerator::visitConstInitVal(SysYParser::ConstInitValContext *ctx)
 		bool isInt = nowArray->isInt;
 		for(int i=count;i<=num;i++)
 		{
-			auto *gZero = any_cast<Value*>(GenerateConstZero());
+			cout<<"GenerateConstZero"<<endl;
+			auto *gZero = any_cast<Value*>(GenerateZero(ConstLayer+1,ConstArrayName));
+			
 			values->addOperand(gZero);
 			/*if(isInt)
 			{
@@ -556,10 +561,14 @@ any SysYIRGenerator::visitInitVal(SysYParser::InitValContext *ctx)
 			count++;
 		}
 		auto *nowArray = arrayTable.query(ArrayName);
-		int num = nowArray->dims[ConstLayer];
+		int num = nowArray->dims[Layer];
 		bool isInt = nowArray->isInt;
 		for(int i=count;i<=num;i++)
 		{
+			cout<<"GenerateConstZero"<<endl;
+			auto *gZero = any_cast<Value*>(GenerateZero(Layer+1,ArrayName));
+			
+			initList->addOperand(gZero);
 			/*int inner
 			for(int j=0;j<)
 			if(isInt)
