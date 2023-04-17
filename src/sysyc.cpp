@@ -33,9 +33,7 @@ int main(int argc, char **argv) {
   generator.visitCompUnit(compile);
   //auto IR = generator.visitExp(exp);
 
-  std::stringstream IRCode;
-  generator.generateCode(IRCode);
-  std::cout << "\n\nIR code:\n" << IRCode.str();
+  generator.generateCode(std::cout);
 
   return EXIT_SUCCESS;
 }
