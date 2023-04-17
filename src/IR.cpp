@@ -173,14 +173,14 @@ Function *CallInst::getCallee() const {
 
 void CallInst::generateCode(std::ostream &out) const {
     auto *func = getCallee();
-    out << "  call, " << func->getName();
+    out << "    call, " << func->getName();
     for (auto operand : getArguments())
       out << ", " << operand.getValue()->name;
     out << "\n";
   }
 
 void UnaryInst::generateCode(std::ostream &out) const {
-  out << "  " + getName() << " = ";
+  out << "    " + getName() << " = ";
   switch (kind) {
     case Instruction::kPos :
     case Instruction::kFPos :
@@ -206,7 +206,7 @@ void UnaryInst::generateCode(std::ostream &out) const {
 }
 
 void BinaryInst::generateCode(std::ostream &out) const {
-  out << "  " + getName() << " = " << getLhs()->getName() << " ";
+  out << "    " + getName() << " = " << getLhs()->getName() << " ";
   switch (kind) {
     case Instruction::kAdd :
     case Instruction::kFAdd :
@@ -265,16 +265,16 @@ void BinaryInst::generateCode(std::ostream &out) const {
 void ReturnInst::generateCode(std::ostream &out) const  {
   auto *retVal = this->getReturnValue();
   if (retVal != nullptr) {
-    out << "  return, " << retVal->getName() << "\n";
+    out << "    return, " << retVal->getName() << "\n";
   } else {
-    out << "  return\n";
+    out << "    return\n";
   }
 }
 
 void UncondBrInst::generateCode(std::ostream &out) const {
   auto *target = getOperand(0);
   auto args = getArguments();
-  out << "  br, " << target->name << "(";
+  out << "    br, " << target->name << "(";
   for (auto it = args.begin(); it != args.end(); ++it) {
     out << (it != args.begin() ? ", " : "") << it->getValue()->name;
   }
@@ -287,7 +287,7 @@ void CondBrInst::generateCode(std::ostream &out) const {
   auto *elseBlock = getElseBlock();
   auto thenArgs = getThenArguments();
   auto elseArgs = getElseArguments();
-  out << "  br, " << getCondition()->name;
+  out << "    br, " << getCondition()->name;
   out << ", " << thenBlock->name << "(";
   for (auto it = thenArgs.begin(); it != thenArgs.end(); ++it) {
     out << (it != thenArgs.begin() ? ", " : "") << it->getValue()->name;
@@ -301,7 +301,7 @@ void CondBrInst::generateCode(std::ostream &out) const {
 }
 
 void AllocaInst::generateCode(std::ostream &out) const {
-  out << "  " + getName() << " = " << "alloca ";
+  out << "    " + getName() << " = " << "alloca ";
   if (getType()->isFloat())
     out << "float";
   else if (getType()->isInt()) {
@@ -322,7 +322,7 @@ void StoreInst::generateCode(std::ostream &out) const {
   auto *ptr = getPointer();
   auto *val = getValue();
   auto indices = getIndices();
-  out << "  store " << ptr->getName() << ", " << val->getName();
+  out << "    store " << ptr->getName() << ", " << val->getName();
   for (auto index : indices) {
     out << "[" << index.getValue()->getName() << "]";
   }
@@ -333,10 +333,11 @@ void BasicBlock::generateCode(std::ostream &out) const {
   out << getName() << "(";
   for (auto it = arguments.begin(); it != arguments.end(); ++it) {
     out << (it != arguments.begin() ? ", " : "");
+    out << (*it)->getName();
   }
   out << "):\n";
-  for (const auto &inst : instructions) {
-    inst->generateCode(out);
+  for (auto it = instructions.begin(); it != instructions.end(); ++it) {
+    (*it)->generateCode(out);
   }
 }
 

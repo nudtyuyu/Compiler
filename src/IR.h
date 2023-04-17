@@ -272,7 +272,7 @@ class BasicBlock : public Value {
 public:
   using inst_list = std::list<std::unique_ptr<Instruction>>;
   using iterator = inst_list::iterator;
-  using arg_list = std::vector<Argument>;
+  using arg_list = std::vector<Argument *>;
   using block_list = std::vector<BasicBlock *>;
 
 protected:
@@ -301,8 +301,8 @@ public:
   iterator end() { return instructions.end(); }
   iterator terminator() { return std::prev(end()); }
   Argument *createArgument(Type *type, const std::string &name = "") {
-    arguments.emplace_back(type, this, arguments.size(), name);
-    return &arguments.back();
+    arguments.emplace_back(new Argument(type, this, arguments.size(), name));
+    return arguments.back();
   };
 
 public:
