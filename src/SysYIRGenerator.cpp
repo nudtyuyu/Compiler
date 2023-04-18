@@ -221,6 +221,9 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 					// array
 					auto *myA = arrayTable.query(name);
 					myA->value = dynamic_cast<InitList *>(initVal);
+					//auto* test = myA->value->getElement({1,1,2});
+					//cout<<test->name<<endl;
+					
 					
 						//arrayTable.insert(name, AEntry(alloca, dynamic_cast<InitList *>(initVal), dims,true,true));
 					
@@ -360,13 +363,13 @@ any SysYIRGenerator::GenerateZero(int Lay,string name)
 		if(isInt)
 		{
 			int z = 0;
-			auto *constzero = (Value*)ConstantValue::get(z);
+			auto *constzero = (Value*)ConstantValue::get(z,"0");
 			return constzero;
 		}
 		else
 		{
 			float z = 0.0;
-			auto *constzero = (Value*)ConstantValue::get(z);
+			auto *constzero = (Value*)ConstantValue::get(z,"0");
 			return constzero;
 		}
 		//return constexp;
@@ -943,7 +946,8 @@ any SysYIRGenerator::visitNumber(SysYParser::NumberContext *ctx)
 	{
 		//return module->createGlobalValue(ctx->IntConst()->getText(),Type::getIntType());	
 		//return ctx->IntConst();
-		int value = atoi(ctx->IntConst()->getText().c_str());
+		//int value = atoi(ctx->IntConst()->getText().c_str());
+		int value = strtol(ctx->IntConst()->getText().c_str(),NULL,0);
 		module->createInteger(ctx->IntConst()->getText(),value);
 		const std::string name = ctx->IntConst()->getText();
 		auto cv = module->getInteger(name);
@@ -957,12 +961,15 @@ any SysYIRGenerator::visitNumber(SysYParser::NumberContext *ctx)
 	{
 		//return module->createGlobalValue(ctx->FloatConst()->getText(),Type::getFloatType());
 		//return ctx->FloatConst();
-		float value = atof(ctx->FloatConst()->getText().c_str());
+		float value = strtof(ctx->FloatConst()->getText().c_str(),NULL);
+		if(ctx->FloatConst()->getText().substr(0,2)=="0x" || ctx->FloatConst()->getText().substr(0,2)=="0X")
+			value = 0.0;
 		module->createFloat(ctx->FloatConst()->getText(),value);
 		
 		//auto name = ctx->FloatConst()->getText();
 		//auto cv = (Value*)ConstantValue::get(value,name);
 		//// cout<<"mynum: "<<cv->name<<endl;
+		cout<<"vlaue: "<<value<<endl;
 		return (Value*)ConstantValue::get(value,ctx->FloatConst()->getText());		
 	}
 	return (Value*)nullptr;
