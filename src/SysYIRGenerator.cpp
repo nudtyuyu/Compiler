@@ -124,7 +124,6 @@ any SysYIRGenerator::visitCompUnit(SysYParser::CompUnitContext *ctx)
 
 any SysYIRGenerator::visitDecl(SysYParser::DeclContext *ctx)
 {
-	// cout<<"visitDecl"<<endl;
 	auto decl = (ctx->constDecl())?visitConstDecl(ctx->constDecl()):visitVarDecl(ctx->varDecl());
 	GlobalVal = false;
 	LocalVal = false;
@@ -1062,7 +1061,7 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 			auto vpU = module->getFloat(nameU);
 			auto vpM = module->getInteger(nameM);
 			// cout<<"floatunary!"<<endl;
-			builder.createIToFInst(multerm);
+			multerm = builder.createIToFInst(multerm, newTemp());
 			if(ctx->Mul())
 			{
 				auto name = nameM+'*'+nameU;
@@ -1103,7 +1102,7 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 			auto vpU = module->getInteger(nameU);
 			auto vpM = module->getFloat(nameM);
 			// cout<<"floatmul!"<<endl;
-			builder.createIToFInst(unarrayTableerm);
+			unarrayTableerm = builder.createIToFInst(unarrayTableerm, newTemp());
 			if(ctx->Mul())
 			{
 				auto name = nameM+'*'+nameU;
@@ -1139,12 +1138,10 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 		}
 		else if(unarrayTableerm->isFloat() && multerm->isFloat())
 		{
-			// cout<<"floatmul!"<<endl;
 			auto nameU = unarrayTableerm->name;
 			auto nameM = multerm->name;
 			auto vpU = module->getFloat(nameU);
 			auto vpM = module->getFloat(nameM);
-			//builder.createIToFInst(multerm);
 			if(ctx->Mul())
 			{
 				auto name = nameM+'*'+nameU;
@@ -1251,7 +1248,7 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 			auto vpA = module->getFloat(nameA);
 			auto vpM = module->getInteger(nameM);
 			// cout<<"float!"<<endl;
-			builder.createIToFInst(multerm);
+			multerm = builder.createIToFInst(multerm, newTemp());
 			if(ctx->Add())
 			{
 				auto name = nameA+'+'+nameM;
@@ -1288,7 +1285,7 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 			auto vpA = module->getInteger(nameA);
 			auto vpM = module->getFloat(nameM);
 			// cout<<"float!"<<endl;
-			builder.createIToFInst(addterm);
+			addterm = builder.createIToFInst(addterm, newTemp());
 			if(ctx->Add())
 			{
 				auto name = nameA+'+'+nameM;
@@ -1315,7 +1312,6 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 					module->createFloat(name,v);
 				}
 				auto sub = builder.createFSubInst(addterm, multerm,newTemp());
-				// cout<<"getfloatsub"<<endl;
 				return (Value*)sub;
 			}
 		}
@@ -1325,8 +1321,6 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 			auto nameM = multerm->name;
 			auto vpA = module->getFloat(nameA);
 			auto vpM = module->getFloat(nameM);
-			// cout<<"float!"<<endl;
-			//builder.createIToFInst(multerm);
 			if(ctx->Add())
 			{
 				auto name = nameA+'+'+nameM;
@@ -1337,7 +1331,6 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 					float v = a+m;
 					module->createFloat(name,v);
 				}
-				// cout<<"getfloatadd"<<endl;
 				auto add = builder.createFAddInst(addterm, multerm, newTemp());
 			
 				return (Value*)add;
@@ -1428,7 +1421,7 @@ any SysYIRGenerator::visitEqExp(SysYParser::EqExpContext* ctx)
 		}
 		else if(eqterm->isInt() && relterm->isFloat())
 		{
-			builder.createIToFInst(eqterm);
+			eqterm = builder.createIToFInst(eqterm, newTemp());
 			if(ctx->Equal())
 			{
 				return (Value *) builder.createFCmpEQInst(eqterm,relterm, newTemp());
@@ -1440,7 +1433,7 @@ any SysYIRGenerator::visitEqExp(SysYParser::EqExpContext* ctx)
 		}
 		else if(eqterm->isFloat() && relterm->isInt())
 		{
-			builder.createIToFInst(relterm);
+			relterm = builder.createIToFInst(relterm, newTemp());
 			if(ctx->Equal())
 			{
 				return (Value *) builder.createFCmpEQInst(eqterm,relterm, newTemp());
@@ -1452,7 +1445,6 @@ any SysYIRGenerator::visitEqExp(SysYParser::EqExpContext* ctx)
 		}
 		else if(eqterm->isFloat() && relterm->isFloat())
 		{
-			//builder.createIToF(eqterm);
 			if(ctx->Equal())
 			{
 				return (Value *) builder.createFCmpEQInst(eqterm,relterm, newTemp());
@@ -1502,7 +1494,7 @@ any SysYIRGenerator::visitRelExp(SysYParser::RelExpContext* ctx)
 		}
 		else if(addterm->isFloat() && relterm->isInt())
 		{
-			builder.createIToFInst(relterm);
+			relterm = builder.createIToFInst(relterm, newTemp());
 			if(ctx->LessThan())
 			{
 				return (Value *) builder.createFCmpLTInst(relterm,addterm, newTemp());
@@ -1522,7 +1514,7 @@ any SysYIRGenerator::visitRelExp(SysYParser::RelExpContext* ctx)
 		}
 		else if(addterm->isInt() && relterm->isFloat())
 		{
-			builder.createIToFInst(addterm);
+			addterm = builder.createIToFInst(addterm, newTemp());
 			if(ctx->LessThan())
 			{
 				return (Value *) builder.createFCmpLTInst(relterm,addterm, newTemp());
@@ -1542,7 +1534,6 @@ any SysYIRGenerator::visitRelExp(SysYParser::RelExpContext* ctx)
 		}
 		else if(addterm->isFloat() && relterm->isFloat())
 		{
-			//builder.createIToFInst(relterm);
 			if(ctx->LessThan())
 			{
 				return (Value *) builder.createFCmpLTInst(relterm,addterm, newTemp());
