@@ -173,10 +173,11 @@ Function *CallInst::getCallee() const {
 
 void CallInst::generateCode(std::ostream &out) const {
     auto *func = getCallee();
-    out << "    call, " << func->getName();
-    for (auto operand : getArguments())
-      out << ", " << operand.getValue()->name;
-    out << "\n";
+    auto args = getArguments();
+    out << "    " << getName() << " = call " << func->getName() << "(";
+    for (auto it = args.begin(); it != args.end(); ++it)
+      out << (it != args.begin() ? ", " : "") << it->getValue()->getName();
+    out << ")\n";
   }
 
 void UnaryInst::generateCode(std::ostream &out) const {
@@ -191,18 +192,18 @@ void UnaryInst::generateCode(std::ostream &out) const {
       out << "-";
       break;
     case Instruction::kNot :
-      out << "not";
+      out << "not ";
       break;
     case Instruction::kFtoI :
-      out << "ftoi";
+      out << "ftoi ";
       break;
     case Instruction::kIToF :
-      out << "itof";
+      out << "itof ";
       break;
     default:
       out << "<error unary instruction type>";
   }
-  out << " " << getOperand() << "\n";
+  out << getOperand()->getName() << "\n";
 }
 
 void BinaryInst::generateCode(std::ostream &out) const {
@@ -254,7 +255,10 @@ void BinaryInst::generateCode(std::ostream &out) const {
     case Instruction::kFCmpGE :
       out << ">=";
       break;
-    // Rem 是啥指令
+    case Instruction::kRem :
+    case Instruction::kFRem :
+      out << "%";
+      break;
     default:
       out << "<error binary instruction type>";
       break;
@@ -265,7 +269,7 @@ void BinaryInst::generateCode(std::ostream &out) const {
 void ReturnInst::generateCode(std::ostream &out) const  {
   auto *retVal = this->getReturnValue();
   if (retVal != nullptr) {
-    out << "    return, " << retVal->getName() << "\n";
+    out << "    return " << retVal->getName() << "\n";
   } else {
     out << "    return\n";
   }
@@ -274,7 +278,7 @@ void ReturnInst::generateCode(std::ostream &out) const  {
 void UncondBrInst::generateCode(std::ostream &out) const {
   auto *target = getOperand(0);
   auto args = getArguments();
-  out << "    br, " << target->name << "(";
+  out << "    bruc " << target->name << "(";
   for (auto it = args.begin(); it != args.end(); ++it) {
     out << (it != args.begin() ? ", " : "") << it->getValue()->name;
   }
@@ -287,7 +291,7 @@ void CondBrInst::generateCode(std::ostream &out) const {
   auto *elseBlock = getElseBlock();
   auto thenArgs = getThenArguments();
   auto elseArgs = getElseArguments();
-  out << "    br, " << getCondition()->name;
+  out << "    brc " << getCondition()->name;
   out << ", " << thenBlock->name << "(";
   for (auto it = thenArgs.begin(); it != thenArgs.end(); ++it) {
     out << (it != thenArgs.begin() ? ", " : "") << it->getValue()->name;
@@ -316,6 +320,11 @@ void AllocaInst::generateCode(std::ostream &out) const {
     out << "]";
   }
   out << "\n";
+}
+
+void LoadInst::generateCode(std::ostream &out) const {
+  auto *ptr = getPointer();
+  out << "    " << getName() << " = load " << ptr->getName() << "\n";
 }
 
 void StoreInst::generateCode(std::ostream &out) const {

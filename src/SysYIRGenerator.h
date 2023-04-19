@@ -2,6 +2,8 @@
 
 #include <memory>
 #include <ostream>
+#include <sstream>
+#include <string>
 #include "IR.h"
 #include "IRBuilder.h"
 #include "SysYBaseVisitor.h"
@@ -115,10 +117,25 @@ public:
 
 public:
     void generateCode(std::ostream &out) const {
-        builder.getBasicBlock()->generateCode(out);
         module->generateCode(out);
     }
-    std::any GenerateZero(int Lay,std::string name);
+    std::any GenerateZero(int Lay, std::string name);
+
+    std::string newTemp() {
+        static std::stringstream ss;
+        static int tmpCount = 0;
+        ss.str("");
+        ss << "T" << (tmpCount++);
+        return ss.str();
+    }
+
+    std::string newBlockName() {
+        static std::stringstream ss;
+        static int blockCount = 0;
+        ss.str("");
+        ss << ".L" << (blockCount++);
+        return ss.str();
+    }
 
 }; // class SysYIRGenerator
 

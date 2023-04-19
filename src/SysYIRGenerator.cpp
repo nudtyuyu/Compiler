@@ -1,6 +1,7 @@
 #include <any>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <utility>
 #include <vector>
 #include <cstdio>
@@ -14,50 +15,20 @@ namespace sysy {
 Value *SysYIRGenerator::getElementPtr(AllocaInst *base, std::vector<Value *> indices) {
 	int ndim = base->getNumDims();
 	assert(ndim == indicies.size());
-	
-	Value *pOffset = builder.createAllocaInst(Type::getPointerType(Type::getIntType()));	///< pointer type
-	builder.createStoreInst(ConstantValue::get(0), pOffset);
-	Value *offset = builder.createLoadInst(pOffset);	///< int type
+	Value *pOffset = builder.createAllocaInst(Type::getPointerType(Type::getIntType()), {}, newTemp());	///< pointer type
+	builder.createStoreInst(ConstantValue::get(0, "0"), pOffset);
+	Value *offset = builder.createLoadInst(pOffset, {}, newTemp());	///< int type
 
-	offset = builder.createPAddInst(offset, indices[0]);
+	offset = builder.createPAddInst(offset, indices[0], newTemp());
 	for (int i = 1; i < ndim; ++i) {
-		offset = builder.createPMulInst(base->getDim(i), offset);
-		offset = builder.createAddInst(offset, indices[i]);
+		offset = builder.createPMulInst(base->getDim(i), offset, newTemp());
+		offset = builder.createAddInst(offset, indices[i], newTemp());
 	}
 
-	Value *ptr = builder.createPAddInst(base, offset, "");
+	Value *ptr = builder.createPAddInst(base, offset, newTemp());
 
 	return ptr;
 }
-
-// 这个函数只需要写对局部数组的赋值就可以了，全局的不用
-// 还没想好怎么写
-// void AssignArray(Value *base, vector<int> dims, int dim, InitList *values)
-// {
-	// if(dim==Dims.size())
-	// {
-	// 	int exist = Values.size();
-	// 	if(exist<Dims[dim-1])
-	// 	{
-	// 		int number = Dims[dim-1];
-	// 		for(int i=exist;i<=number;i++)
-	// 		{
-	// 			auto zero = ConstantValue::get(0,"0");
-	// 			vector<Value*> v;
-	// 			v.push_back((Value*)zero);
-	// 			Values.push_back(v);
-	// 		}
-	// 	}
-	// }
-	// else
-	// {
-	// 	int L = Dims[dim-1];
-	// 	for(int i=0;i<L;i++)
-	// 	{
-	// 		AssignArray((vector<vector<Value*> >)Values[i],Dims,dim+1);
-	// 	}
-	// }
-// }
 
 // any getInitValues(vector<vector<Value*> >Values,vector<int>Dims,int dim,int flag)
 // {
@@ -132,26 +103,21 @@ Value *SysYIRGenerator::getElementPtr(AllocaInst *base, std::vector<Value *> ind
 
 any SysYIRGenerator::visitCompUnit(SysYParser::CompUnitContext *ctx)
 {
-	// cout<<"visitCompUnit"<<endl;
 	auto Unit = new Module;
 	assert(Unit);
 	module.reset(Unit);
 	ConstInitListName = 0;
 	InitListName = 0;
-	// Decl: createGlobal value
 	symTable.newTable();
 	arrayTable.newTable();
 	for(auto decl:ctx->decl())
 	{
 		GlobalVal  = true;
-		//module->createGlobalValue()
 		visitDecl(decl);
 	}
-	// cout<<"visit decl finish!"<<endl;
 	for (auto *func : ctx->funcDef())
 		visitFuncDef(func);
 	
-	// cout << "finish!" << endl;
 	return nullptr;
 }
 
@@ -357,22 +323,18 @@ any SysYIRGenerator::GenerateZero(int Lay,string name)
 		Lay = Num_Layer-1;
 	int num = nowArray->dims[Lay];
 	bool isInt = nowArray->isInt;
-	// cout<<"Lay: "<<Lay<<" , Num_Layer-1: "<<Num_Layer-1<<endl;
 	if(Lay>=Num_Layer-1)
 	{
 		if(isInt)
 		{
-			int z = 0;
-			auto *constzero = (Value*)ConstantValue::get(z,"0");
+			auto *constzero = (Value*)ConstantValue::get(0,"0");
 			return constzero;
 		}
 		else
 		{
-			float z = 0.0;
-			auto *constzero = (Value*)ConstantValue::get(z,"0");
+			auto *constzero = (Value*)ConstantValue::get(0.0f,"0.0");
 			return constzero;
 		}
-		//return constexp;
 		return nullptr;
 	}
 	else
@@ -381,8 +343,6 @@ any SysYIRGenerator::GenerateZero(int Lay,string name)
 		sprintf(Name,"ConstInitName%d",ConstInitListName);
 		auto *values = module->createInitList(Name);
 		ConstInitListName+=1;
-		//// cout<<"constInitZeroSize: "<<ctx->constInitVal().size()<<endl;
-		//int count=0;
 		
 		for(int i=0;i<num;i++)
 		{
@@ -531,11 +491,11 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 			{
 				if(type->isInt())
 				{
-					auto *store = builder.createStoreInst(ConstantValue::get(0), alloca);
+					auto *store = builder.createStoreInst(ConstantValue::get(0, "0"), alloca);
 				}
 				else if(type->isFloat())
 				{
-					auto *store = builder.createStoreInst(ConstantValue::get(0.0f), alloca);
+					auto *store = builder.createStoreInst(ConstantValue::get(0.0f, "0.0"), alloca);
 				}
 			
 			}
@@ -624,7 +584,7 @@ any SysYIRGenerator::visitFuncDef(SysYParser::FuncDefContext *ctx) {
 	symTable.newTable();
 	for (int i = 0; i < paramTypes.size(); ++i) {
 		auto *arg = entry->createArgument(paramTypes[i], paramNames[i]);
-		auto *ptr = builder.createAllocaInst(paramTypes[i], {}, "p" + paramNames[i]);
+		auto *ptr = builder.createAllocaInst(paramTypes[i], {}, newTemp());
 		builder.createStoreInst(arg, ptr);
 		symTable.insert(paramNames[i], Entry(ptr));
 	}
@@ -671,11 +631,11 @@ any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx) {
 			value = any_cast<Value *>(visitExp(ctx->exp()));
 		ret = builder.createReturnInst(value);
 	} else if (ctx->If() != nullptr) {
-		auto *block = builder.getBasicBlock();   	///< 当前所在基本块
-		auto *func = block->getParent();         	///< 当前所在函数
-		auto *thenBlock = func->addBasicBlock(); 	///< then分支基本块
-		auto *elseBlock = func->addBasicBlock();    ///< else分支基本块（可能没有，但构造指令时不能为nullptr）
-		auto *exitBlock = func->addBasicBlock(); 	///< if-then-else结束后的部分
+		auto *block = builder.getBasicBlock();   						///< 当前所在基本块
+		auto *func = block->getParent();         						///< 当前所在函数
+		auto *thenBlock = func->addBasicBlock(newBlockName()); 			///< then分支基本块
+		auto *elseBlock = func->addBasicBlock(newBlockName());   		///< else分支基本块（可能没有，但构造指令时不能为nullptr）
+		auto *exitBlock = func->addBasicBlock(newBlockName()); 			///< if-then-else结束后的部分
 		auto *cond = any_cast<Value *>(visitCond(ctx->cond()));
 
 		ret = builder.createCondBrInst(cond, thenBlock, elseBlock, {}, {});
@@ -685,6 +645,7 @@ any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx) {
 		thenBlock->getPredecessors().push_back(block);
 		builder.setPosition(thenBlock, thenBlock->end());
 		visitStmt(ctx->stmt()[0]);
+		builder.createUncondBrInst(exitBlock, {});
 		builder.setPosition(block, block->end());
 
 		// translate elseblock
@@ -693,9 +654,8 @@ any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx) {
 		builder.setPosition(elseBlock, elseBlock->end());
 		if (ctx->Else() != nullptr) {
 			visitStmt(ctx->stmt()[1]);
-		} else {
-			builder.createUncondBrInst(exitBlock, {});
 		}
+		builder.createUncondBrInst(exitBlock, {});
 		builder.setPosition(block, block->end());
 
 		// prepare to translate exitblock
@@ -705,9 +665,9 @@ any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx) {
 	} else if (ctx->While() != nullptr) {
 		auto *block = builder.getBasicBlock();    ///< 当前所在基本块
 		auto *func = block->getParent();          ///< 当前所在函数
-		auto *entryBlock = func->addBasicBlock(); ///< 循环入口，即循环条件计算和判断
-		auto *innerBlock = func->addBasicBlock(); ///< while循环体块
-		auto *exitBlock = func->addBasicBlock();  ///< while循环结束后的部分
+		auto *entryBlock = func->addBasicBlock(newBlockName()); ///< 循环入口，即循环条件计算和判断
+		auto *innerBlock = func->addBasicBlock(newBlockName()); ///< while循环体块
+		auto *exitBlock = func->addBasicBlock(newBlockName());  ///< while循环结束后的部分
 
 		block->getSuccessors().push_back(entryBlock);
 		entryBlock->getPredecessors().push_back(block);
@@ -768,13 +728,13 @@ any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx) {
 
 	for (auto *exp : ctx->exp()) {
 		auto *e = any_cast<Value *>(visitExp(exp));
-		auto *pInteger = module->getInteger(e->name);
+		auto *pInteger = module->getInteger(e->getName());
 		if(pInteger!=nullptr)
 		{
 			/*char num[50]={0};
 			snprintf(num,sizeof(num),"%d",*pInteger);
 			name = name + "[" + num + "]";*/
-			exps.push_back(ConstantValue::get(*pInteger));
+			exps.push_back(ConstantValue::get(*pInteger, e->getName()));
 		} else {
 			//name = name + "[" + e->name + "]";
 			constflag = false;
@@ -787,19 +747,21 @@ any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx) {
 		// array
 		auto *entry = arrayTable.query(ctx->Identifier()->getText());
 		int ndim = entry->dims.size();
-		Value *pOffset = builder.createAllocaInst(Type::getPointerType(Type::getIntType()));
-		builder.createStoreInst(ConstantValue::get(0), pOffset);
-		Value *offset = builder.createLoadInst(pOffset);
+		Value *pOffset = builder.createAllocaInst(Type::getPointerType(Type::getIntType()), {}, newTemp());
+		builder.createStoreInst(ConstantValue::get(0, "0"), pOffset);
+		Value *offset = builder.createLoadInst(pOffset, {}, newTemp());
 
 		if (ndim != 0) {
-			offset = builder.createPAddInst(offset, exps[0]);
+			offset = builder.createPAddInst(offset, exps[0], newTemp());
 		}
 		for (int i = 1; i < ndim; ++i) {
-			offset = builder.createPMulInst(ConstantValue::get(entry->dims[i]), offset);
-			offset = builder.createPAddInst(offset, exps[i]);
+			stringstream ss;
+			ss << entry->dims[i];
+			offset = builder.createPMulInst(ConstantValue::get(entry->dims[i], ss.str()), offset, newTemp());
+			offset = builder.createPAddInst(offset, exps[i], newTemp());
 		}
 
-		Value *ptr = builder.createPAddInst(entry->base, offset, ctx->getText());
+		Value *ptr = builder.createPAddInst(entry->base, offset, newTemp());
 		if (constflag && entry->isConst) {
 			vector<int> indices;
 			for (auto *index : exps) {
@@ -837,100 +799,25 @@ any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
 		// symTable.view();
 		// arrayTable.view();
 		auto name = (ptr != nullptr ? ptr->name : value->name);
-		// cout<<"the lval's name: "<<name<<endl;
-		// auto *entry = symTable.query(name);
-		// int index = name.find("[",0);
-		// // cout<<"index of bracket: "<<index<<endl;
-		// AEntry *ptr2=nullptr;
-		// if(ptr==nullptr)
-		// {
-		// 	// cout<<"query ptr2!"<<endl;
-		// 	// cout<<"name.substr: "<<name.substr(0,index)<<endl;
-		// 	ptr2 = arrayTable.query(name.substr(0,index));
-		// }
-		/*else
-		{
-			// cout<<"query ptr2! 111"<<endl;
-			ptr2 = arrayTable.query(name.substr(0,index));
-		}*/
-		//auto *found = module->getInteger(name);
 		if(ptr!=nullptr)
 		{
 			// var
 			auto *baseType = dynamic_cast<PointerType *>(ptr->getType())->getBaseType();
 			// cout<<"ValType: "<<baseType<<endl;
-			auto *loadValue = builder.createLoadInst(ptr,{},name);
+			auto *loadValue = builder.createLoadInst(ptr,{},newTemp());
 			// cout<<"load value"<<endl;
 			return (Value *)loadValue;
-			// if(baseType->isInt())
-			// {
-			// 	// cout<<"add const val to module integer!"<<endl;
-			// 	auto v = dynamic_cast<ConstantValue*>(addr.second);
-			// 	if(v!=nullptr)
-			// 	{
-			// 		int value = v->getInt();
-			// 		module->createInteger(name,value);
-			// 	}
-				
-			// }
-			// else if(identType->isFloat())
-			// {
-			// 	// cout<<"add const val to module float!"<<endl;
-			// 	auto v = dynamic_cast<ConstantValue*>(addr.second);
-			// 	if(v!=nullptr)
-			// 	{
-			// 		float value = v->getFloat();
-			// 		module->createFloat(name,value);
-			// 	}
-			// }
 		}
 		else
 		{
 			// const
 			return (Value *)value;
 		}
-		// else if(ptr2!=nullptr)
-		// {
-		// 	/// Here!!!Big Question!!! How to get the value!!!
-		// 	/// The constant value of every element!!!
-		// 	// cout<<"ptr2!!!!"<<endl;
-		// 	int Var = ptr2->isConst;
-		// 	auto *ident = dynamic_cast<PointerType*>(ptr2->value->getType());
-		// 	auto *identType = ident->getBaseType();
-		// 	// cout<<"ValType: "<<Var<<endl;
-		// 	if(Var==1)
-		// 	{
-		// 		if(identType->isInt())
-		// 		{
-		// 			// cout<<"add const val to module integer!"<<endl;
-		// 			auto v = dynamic_cast<ConstantValue*>(addr.second);
-		// 			if(v!=nullptr)
-		// 			{
-		// 				int value =v->getInt();
-		// 				module->createInteger(name,value);
-		// 			}
-		// 		}
-		// 		else if(identType->isFloat())
-		// 		{
-		// 			// cout<<"add const val to module float!"<<endl;
-		// 			auto v = dynamic_cast<ConstantValue*>(addr.second);
-		// 			if(v!=nullptr)
-		// 			{
-		// 				float value = v->getFloat();
-		// 				module->createFloat(name,value);
-		// 			}
-		// 		}
-		// 	}
-		//if(ptr2!=nullptr && name.substr(0,1)=="0")
-		//	name = name.substr(1,name.length());
-		//symTable.view();
-		// return (Value *)value;
-		//// cout<<"This is LVal, waiting to edit"<<endl;
 	}
 	else if(ctx->number())
 	{
 		auto *num = any_cast<Value *>(visitNumber(ctx->number()));//waiting
-		// cout<<"num: "<<num->name<<endl;
+		// cout<<"num: "<<num->getName()<<endl;
 		// cout<<"getnum"<<endl;
 		return num;
 	}
@@ -955,7 +842,6 @@ any SysYIRGenerator::visitNumber(SysYParser::NumberContext *ctx)
 		//auto cv = (Value*)ConstantValue::get(value,name);
 		//// cout<<"mynum: "<<cv->name<<endl;
 		return (Value*)ConstantValue::get(value,ctx->IntConst()->getText());
-			
 	}
 	else if(ctx->FloatConst())
 	{
@@ -1003,7 +889,7 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 			}
 		}
 		
-		return (Value*) builder.createCallInst(callee,args,entry,ctx->Identifier()->getText());
+		return (Value*) builder.createCallInst(callee,args,entry, newTemp());
 	} 
 	else if(ctx->unaryOp() != nullptr)
 	{
@@ -1022,7 +908,7 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 					v = v;
 					module->createInteger(name,v);
 				}
-				auto *unary = builder.createPosInst(term,name);
+				auto *unary = builder.createPosInst(term,newTemp());
 				// cout<<"PositiveUnary: wait for edit!"<<endl;
 				return (Value*)unary;
 			}
@@ -1037,7 +923,7 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 					v = -v;
 					module->createInteger(name,v);
 				}
-				auto *unary = builder.createNegInst(term,name);
+				auto *unary = builder.createNegInst(term, newTemp());
 				// cout<<"getunarysub"<<endl;
 				return (Value*)unary;
 			}
@@ -1052,7 +938,7 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 					v = !v;
 					module->createInteger(name,v);
 				}
-				auto *unary = builder.createNotInst(term,name);
+				auto *unary = builder.createNotInst(term,newTemp());
 				// cout<<"getunarynot"<<endl;
 				return (Value*)unary;
 			}
@@ -1071,7 +957,7 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 					v = v;
 					module->createFloat(name,v);
 				}
-				auto *unary = builder.createFPosInst(term,name);
+				auto *unary = builder.createFPosInst(term,newTemp());
 				// cout<<"PositiveUnary: wait for edit!"<<endl;
 				return (Value*)unary;
 			}
@@ -1086,14 +972,14 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 					v = -v;
 					module->createFloat(name,v);
 				}
-				auto *unary = builder.createFNegInst(term,name);
+				auto *unary = builder.createFNegInst(term,newTemp());
 				// cout<<"getunarysub"<<endl;
 				return (Value*)unary;
 			}
 			else if(ctx->unaryOp()->Not()) //question???
 			{
 				// Type! Int or Float!
-				auto *unary = builder.createNotInst(term);
+				auto *unary = builder.createNotInst(term, newTemp());
 				// cout<<"getunarynot"<<endl;
 				return (Value*)unary;
 			}
@@ -1136,7 +1022,7 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 					int v = u*m;
 					module->createInteger(name,v);
 				}
-				auto mul = builder.createMulInst(multerm,unarrayTableerm,name);
+				auto mul = builder.createMulInst(multerm,unarrayTableerm,newTemp());
 				// cout<<"getmul"<<endl;
 				return (Value*)mul;
 			}
@@ -1150,7 +1036,7 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 					int v = m/u;
 					module->createInteger(name,v);
 				}
-				auto div = builder.createDivInst(multerm,unarrayTableerm,name);
+				auto div = builder.createDivInst(multerm,unarrayTableerm,newTemp());
 				// cout<<"getdiv"<<endl;
 				return (Value*)div;
 			}
@@ -1164,7 +1050,7 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 					int v = m%u;
 					module->createInteger(name,v);
 				}
-				auto mod = builder.createRemInst(multerm,unarrayTableerm,name);
+				auto mod = builder.createRemInst(multerm,unarrayTableerm,newTemp());
 				// cout<<"getmod"<<endl;
 				return (Value*)mod;
 			}
@@ -1187,7 +1073,7 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 					float v = u*m;
 					module->createFloat(name,v);
 				}
-				auto mul = builder.createFMulInst(multerm,unarrayTableerm,name);
+				auto mul = builder.createFMulInst(multerm,unarrayTableerm,newTemp());
 				// cout<<"getmul"<<endl;
 				return (Value*)mul;
 			}
@@ -1201,7 +1087,7 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 					float v = m/u;
 					module->createFloat(name,v);
 				}
-				auto div = builder.createFDivInst(multerm,unarrayTableerm,name);
+				auto div = builder.createFDivInst(multerm,unarrayTableerm,newTemp());
 				// cout<<"getdiv"<<endl;
 				return (Value*)div;
 			}
@@ -1228,7 +1114,7 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 					float v = u*m;
 					module->createFloat(name,v);
 				}
-				auto mul = builder.createFMulInst(multerm,unarrayTableerm,name);
+				auto mul = builder.createFMulInst(multerm,unarrayTableerm,newTemp());
 				// cout<<"getmul"<<endl;
 				return (Value*)mul;
 			}
@@ -1242,7 +1128,7 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 					float v = m/u;
 					module->createFloat(name,v);
 				}
-				auto div = builder.createFDivInst(multerm,unarrayTableerm,name);
+				auto div = builder.createFDivInst(multerm,unarrayTableerm,newTemp());
 				// cout<<"getdiv"<<endl;
 				return (Value*)div;
 			}
@@ -1269,7 +1155,7 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 					float v = m*u;
 					module->createFloat(name,v);
 				}
-				auto mul = builder.createFMulInst(multerm,unarrayTableerm,name);
+				auto mul = builder.createFMulInst(multerm,unarrayTableerm,newTemp());
 				// cout<<"getmul"<<endl;
 				return (Value*)mul;
 			}
@@ -1283,7 +1169,7 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 					float v = m/u;
 					module->createFloat(name,v);
 				}
-				auto div = builder.createFDivInst(multerm,unarrayTableerm,name);
+				auto div = builder.createFDivInst(multerm,unarrayTableerm,newTemp());
 				// cout<<"getdiv"<<endl;
 				return (Value*)div;
 			}
@@ -1339,7 +1225,7 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 					module->createInteger(name,v);
 				}
 				// cout<<"getadd"<<endl;
-				auto add = builder.createAddInst(addterm, multerm,name); //name????
+				auto add = builder.createAddInst(addterm, multerm,newTemp());
 			
 				return (Value*)add;
 			}
@@ -1353,7 +1239,7 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 					int v = a-m;
 					module->createInteger(name,v);
 				}
-				auto sub = builder.createSubInst(addterm, multerm,name); //name????
+				auto sub = builder.createSubInst(addterm, multerm, newTemp());
 				// cout<<"getsub"<<endl;
 				return (Value*)sub;
 			}
@@ -1377,7 +1263,7 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 					module->createFloat(name,v);
 				}
 				// cout<<"getfloatadd"<<endl;
-				auto add = builder.createFAddInst(addterm, multerm,name); //name????
+				auto add = builder.createFAddInst(addterm, multerm,newTemp());
 				return (Value*)add;
 			}
 			else if(ctx->Sub())
@@ -1390,7 +1276,7 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 					float v = a-m;
 					module->createFloat(name,v);
 				}
-				auto sub = builder.createFSubInst(addterm, multerm,name); //name????
+				auto sub = builder.createFSubInst(addterm, multerm,newTemp());
 				// cout<<"getfloatsub"<<endl;
 				return (Value*)sub;
 			}
@@ -1414,7 +1300,7 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 					module->createFloat(name,v);
 				}
 				// cout<<"getfloatadd"<<endl;
-				auto add = builder.createFAddInst(addterm, multerm,name); //name????
+				auto add = builder.createFAddInst(addterm, multerm,newTemp());
 			
 				return (Value*)add;
 			}
@@ -1428,7 +1314,7 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 					float v = a-m;
 					module->createFloat(name,v);
 				}
-				auto sub = builder.createFSubInst(addterm, multerm,name); //name????
+				auto sub = builder.createFSubInst(addterm, multerm,newTemp());
 				// cout<<"getfloatsub"<<endl;
 				return (Value*)sub;
 			}
@@ -1452,7 +1338,7 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 					module->createFloat(name,v);
 				}
 				// cout<<"getfloatadd"<<endl;
-				auto add = builder.createFAddInst(addterm, multerm); //name????
+				auto add = builder.createFAddInst(addterm, multerm, newTemp());
 			
 				return (Value*)add;
 			}
@@ -1466,7 +1352,7 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 					float v = a-m;
 					module->createFloat(name,v);
 				}
-				auto sub = builder.createFSubInst(addterm, multerm,name); //name????
+				auto sub = builder.createFSubInst(addterm, multerm,newTemp());
 				// cout<<"getfloatsub"<<endl;
 				return (Value*)sub;
 			}
@@ -1483,7 +1369,7 @@ any SysYIRGenerator::visitLOrExp(SysYParser::LOrExpContext* ctx)
 		Value* andterm = any_cast<Value *>(visitLAndExp(ctx->lAndExp()));
 		Value* orterm = any_cast<Value *>(visitLOrExp(ctx->lOrExp()));
 		//return builder.create... undefine,waiting
-		auto *lor = builder.createOrInst(andterm,orterm);
+		auto *lor = builder.createOrInst(andterm,orterm, newTemp());
 		return (Value *)lor;
 	}
 	else if(ctx->lAndExp() != nullptr)
@@ -1509,7 +1395,7 @@ any SysYIRGenerator::visitLAndExp(SysYParser::LAndExpContext* ctx)
 		Value* eqterm = any_cast<Value *>(visitEqExp(ctx->eqExp()));
 		// return builder.create... undefine,waiting
 		//return ....
-		auto land = builder.createAndInst(andterm,eqterm);
+		auto land = builder.createAndInst(andterm,eqterm, newTemp());
 		return (Value *)land;
 	}
 	return (Value *)nullptr;
@@ -1533,11 +1419,11 @@ any SysYIRGenerator::visitEqExp(SysYParser::EqExpContext* ctx)
 		{
 			if(ctx->Equal())
 			{
-				return (Value *) builder.createICmpEQInst(eqterm,relterm);
+				return (Value *) builder.createICmpEQInst(eqterm,relterm, newTemp());
 			}
 			else if(ctx->NonEqual())
 			{
-				return (Value *) builder.createICmpNEInst(eqterm,relterm);
+				return (Value *) builder.createICmpNEInst(eqterm,relterm, newTemp());
 			}
 		}
 		else if(eqterm->isInt() && relterm->isFloat())
@@ -1545,11 +1431,11 @@ any SysYIRGenerator::visitEqExp(SysYParser::EqExpContext* ctx)
 			builder.createIToFInst(eqterm);
 			if(ctx->Equal())
 			{
-				return (Value *) builder.createFCmpEQInst(eqterm,relterm);
+				return (Value *) builder.createFCmpEQInst(eqterm,relterm, newTemp());
 			}
 			else if(ctx->NonEqual())
 			{
-				return (Value *) builder.createFCmpNEInst(eqterm,relterm);
+				return (Value *) builder.createFCmpNEInst(eqterm,relterm, newTemp());
 			}
 		}
 		else if(eqterm->isFloat() && relterm->isInt())
@@ -1557,11 +1443,11 @@ any SysYIRGenerator::visitEqExp(SysYParser::EqExpContext* ctx)
 			builder.createIToFInst(relterm);
 			if(ctx->Equal())
 			{
-				return (Value *) builder.createFCmpEQInst(eqterm,relterm);
+				return (Value *) builder.createFCmpEQInst(eqterm,relterm, newTemp());
 			}
 			else if(ctx->NonEqual())
 			{
-				return (Value *) builder.createFCmpNEInst(eqterm,relterm);
+				return (Value *) builder.createFCmpNEInst(eqterm,relterm, newTemp());
 			}
 		}
 		else if(eqterm->isFloat() && relterm->isFloat())
@@ -1569,11 +1455,11 @@ any SysYIRGenerator::visitEqExp(SysYParser::EqExpContext* ctx)
 			//builder.createIToF(eqterm);
 			if(ctx->Equal())
 			{
-				return (Value *) builder.createFCmpEQInst(eqterm,relterm);
+				return (Value *) builder.createFCmpEQInst(eqterm,relterm, newTemp());
 			}
 			else if(ctx->NonEqual())
 			{
-				return (Value *) builder.createFCmpNEInst(eqterm,relterm);
+				return (Value *) builder.createFCmpNEInst(eqterm,relterm, newTemp());
 			}
 		}
 	}
@@ -1599,19 +1485,19 @@ any SysYIRGenerator::visitRelExp(SysYParser::RelExpContext* ctx)
 		{
 			if(ctx->LessThan())
 			{
-				return (Value *) builder.createICmpLTInst(relterm,addterm);
+				return (Value *) builder.createICmpLTInst(relterm,addterm, newTemp());
 			}
 			else if(ctx->GreaterThan())
 			{
-				return (Value *)builder.createICmpGTInst(relterm,addterm);
+				return (Value *)builder.createICmpGTInst(relterm,addterm, newTemp());
 			}
 			else if(ctx->LessEqual())
 			{
-				return (Value *) builder.createICmpLEInst(relterm,addterm);
+				return (Value *) builder.createICmpLEInst(relterm,addterm, newTemp());
 			}
 			else if(ctx->GreaterEqual())
 			{
-				return (Value *) builder.createICmpGEInst(relterm,addterm);
+				return (Value *) builder.createICmpGEInst(relterm,addterm, newTemp());
 			}	
 		}
 		else if(addterm->isFloat() && relterm->isInt())
@@ -1619,19 +1505,19 @@ any SysYIRGenerator::visitRelExp(SysYParser::RelExpContext* ctx)
 			builder.createIToFInst(relterm);
 			if(ctx->LessThan())
 			{
-				return (Value *) builder.createFCmpLTInst(relterm,addterm);
+				return (Value *) builder.createFCmpLTInst(relterm,addterm, newTemp());
 			}
 			else if(ctx->GreaterThan())
 			{
-				return (Value *) builder.createFCmpGTInst(relterm,addterm);
+				return (Value *) builder.createFCmpGTInst(relterm,addterm, newTemp());
 			}
 			else if(ctx->LessEqual())
 			{
-				return (Value *) builder.createFCmpLEInst(relterm,addterm);
+				return (Value *) builder.createFCmpLEInst(relterm,addterm, newTemp());
 			}
 			else if(ctx->GreaterEqual())
 			{
-				return (Value *) builder.createFCmpGEInst(relterm,addterm);
+				return (Value *) builder.createFCmpGEInst(relterm,addterm, newTemp());
 			}	
 		}
 		else if(addterm->isInt() && relterm->isFloat())
@@ -1639,19 +1525,19 @@ any SysYIRGenerator::visitRelExp(SysYParser::RelExpContext* ctx)
 			builder.createIToFInst(addterm);
 			if(ctx->LessThan())
 			{
-				return (Value *) builder.createFCmpLTInst(relterm,addterm);
+				return (Value *) builder.createFCmpLTInst(relterm,addterm, newTemp());
 			}
 			else if(ctx->GreaterThan())
 			{
-				return (Value *) builder.createFCmpGTInst(relterm,addterm);
+				return (Value *) builder.createFCmpGTInst(relterm,addterm, newTemp());
 			}
 			else if(ctx->LessEqual())
 			{
-				return (Value *) builder.createFCmpLEInst(relterm,addterm);
+				return (Value *) builder.createFCmpLEInst(relterm,addterm, newTemp());
 			}
 			else if(ctx->GreaterEqual())
 			{
-				return (Value *) builder.createFCmpGEInst(relterm,addterm);
+				return (Value *) builder.createFCmpGEInst(relterm,addterm, newTemp());
 			}	
 		}
 		else if(addterm->isFloat() && relterm->isFloat())
@@ -1659,19 +1545,19 @@ any SysYIRGenerator::visitRelExp(SysYParser::RelExpContext* ctx)
 			//builder.createIToFInst(relterm);
 			if(ctx->LessThan())
 			{
-				return (Value *) builder.createFCmpLTInst(relterm,addterm);
+				return (Value *) builder.createFCmpLTInst(relterm,addterm, newTemp());
 			}
 			else if(ctx->GreaterThan())
 			{
-				return (Value *) builder.createFCmpGTInst(relterm,addterm);
+				return (Value *) builder.createFCmpGTInst(relterm,addterm, newTemp());
 			}
 			else if(ctx->LessEqual())
 			{
-				return (Value *) builder.createFCmpLEInst(relterm,addterm);
+				return (Value *) builder.createFCmpLEInst(relterm,addterm, newTemp());
 			}
 			else if(ctx->GreaterEqual())
 			{
-				return (Value *) builder.createFCmpGEInst(relterm,addterm);
+				return (Value *) builder.createFCmpGEInst(relterm,addterm, newTemp());
 			}	
 		}
 		
@@ -1685,61 +1571,5 @@ any SysYIRGenerator::visitConstExp(SysYParser::ConstExpContext *ctx)
 	// cout<<"visitConstExp"<<endl;
 	return visitAddExp(ctx->addExp());
 }
-
-/*any SysYIRGenerator::visitModule(SysYParser::ModuleContext *ctx) {
-  auto pModule = new Module();
-  assert(pModule);
-  module.reset(pModule);
-  visitChildren(ctx);
-  return pModule;
-}
-
-any SysYIRGenerator::visitFunc(SysYParser::FuncContext *ctx) {
-  auto name = ctx->ID()->getText();
-  auto params = ctx->funcFParams()->funcFParam();
-  vector<Type *> paramTypes;
-  vector<string> paramNames;
-  for (auto param : params) {
-	paramTypes.push_back(any_cast<Type *>(visitBtype(param->btype())));
-	paramNames.push_back(param->ID()->getText());
-  }
-  Type *returnType = any_cast<Type *>(visitFuncType(ctx->funcType()));
-  auto funcType = Type::getFunctionType(returnType, paramTypes);
-  auto function = module->createFunction(name, funcType);
-  auto entry = function->getEntryBlock();
-  for (auto i = 0; i < paramTypes.size(); ++i)
-	entry->createArgument(paramTypes[i], paramNames[i]);
-  builder.setPosition(entry, entry->end());
-  visitBlockStmt(ctx->blockStmt());
-  return function;
-}
-any SysYIRGenerator::visitBtype(SysYParser::BtypeContext *ctx) {
-  return ctx->INT() ? Type::getIntType() : Type::getFloatType();
-}
-
-any SysYIRGenerator::visitBlockStmt(SysYParser::BlockStmtContext *ctx) {
-  for (auto item : ctx->blockItem())
-	visitBlockItem(item);
-  return builder.getBasicBlock();
-}
-
-any SysYIRGenerator::visitBlockItem(SysYParser::BlockItemContext *ctx) {
-  return ctx->decl() ? visitDecl(ctx->decl()) : visitStmt(ctx->stmt());
-}
-
-any SysYIRGenerator::visitDecl(SysYParser::DeclContext *ctx) {
-  std::vector<Value *> values;
-  auto type = any_cast<Type *>(visitBtype(ctx->btype()));
-  for (auto varDef : ctx->varDef()) {
-	auto name = varDef->lValue()->ID()->getText();
-	auto alloca = builder.createAllocaInst(type, {}, name);
-	if (varDef->ASSIGN()) {
-	  auto value = any_cast<Value *>(varDef->initValue()->accept(this));
-	  auto store = builder.createStoreInst(value, alloca);
-	}
-	values.push_back(alloca);
-  }
-  return values;
-}*/
 
 } // namespace sysy

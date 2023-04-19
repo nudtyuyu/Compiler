@@ -634,6 +634,7 @@ protected:
            BasicBlock *parent = nullptr, const std::string &name = "")
       : Instruction(kLoad, pointer->getType()->as<PointerType>()->getBaseType(),
                     parent, name) {
+    addOperand(pointer);
     addOperands(indices);
   }
 
@@ -644,6 +645,9 @@ public:
     return make_range(std::next(operand_begin()), operand_end());
   }
   Value *getIndex(int index) const { return getOperand(index + 1); }
+
+public:
+  void generateCode(std::ostream &out) const override;
 }; // class LoadInst
 
 //! Store a value to memory address specified by a pointer value
@@ -682,7 +686,7 @@ class Function : public Value {
 protected:
   Function(Module *parent, Type *type, const std::string &name)
       : Value(type, name), parent(parent), blocks() {
-    blocks.emplace_back(new BasicBlock(this, "entry"));
+    blocks.emplace_back(new BasicBlock(this, name));
   }
 
 public:
