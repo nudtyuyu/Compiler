@@ -1,39 +1,55 @@
-//#include "ASTPrinter.h"
 #include "tree/ParseTreeWalker.h"
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
-#include <sstream>
+using namespace std;
 #include "SysYLexer.h"
 #include "SysYParser.h"
 using namespace antlr4;
-#include "SysYFormatter.h"
+// #include "SysYFormatter.h"
 #include "SysYIRGenerator.h"
+#include "backend/codegen.hpp"
+using namespace sysy;
+using backend::CodeGen;
 
 int main(int argc, char **argv) {
-  if (argc != 2) {
-    std::cerr << "Usage: " << argv[0] << "inputfile\n";
+  if (argc > 3) {
+    cerr << "Usage: " << argv[0] << "inputfile [ir]\n";
     return EXIT_FAILURE;
   }
-  std::ifstream fin(argv[1]);
+  bool genir = false;
+  if(argc > 2){
+    genir = true;
+  }
+  ifstream fin(argv[1]);
   if (not fin) {
-    std::cerr << "Failed to open file " << argv[1];
+    cerr << "Failed to open file " << argv[1];
     return EXIT_FAILURE;
   }
   ANTLRInputStream input(fin);
   SysYLexer lexer(&input);
   CommonTokenStream tokens(&lexer);
   SysYParser parser(&tokens);
-  //auto module = parser.module();
+  //auto moduleAST = parser.module();
+  
   auto compile = parser.compUnit();
-  //auto exp = parser.exp();
 
   sysy::SysYIRGenerator generator;
-  //generator.visitModule();
   generator.visitCompUnit(compile);
-  //auto IR = generator.visitExp(exp);
 
-  generator.generateCode(std::cout);
+  //SysYIRGenerator generator;
+  //generator.visitModule(moduleAST);
+  auto moduleIR = generator.get();
+  //only generate SysY IR code
+  if(genir){
+    //moduleIR->print(cout);
+    generator.generateCode(std::cout);
+    return EXIT_SUCCESS;
+  }
 
+  CodeGen codegen(moduleIR);
+  string asmCode = codegen.code_gen();
+  cout << asmCode << endl;;
+  
   return EXIT_SUCCESS;
 }

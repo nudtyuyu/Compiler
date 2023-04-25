@@ -34,11 +34,11 @@ protected:
   }
 
 public:
-//   virtual std::any visitModule(SysYParser::ModuleContext *ctx) override {
-//     return visitChildren(ctx);
-//   }
+  //   virtual std::any visitModule(SysYParser::ModuleContext *ctx) override {
+  //     return visitChildren(ctx);
+  //   }
 
-  /*virtual std::any visitBtype(SysYParser::BtypeContext *ctx) override {
+  virtual std::any visitBtype(SysYParser::BtypeContext *ctx) override {
     os << ctx->getText();
     return 0;
   }
@@ -62,13 +62,14 @@ public:
     return 0;
   }
 
-  virtual std::any
-  visitArrayInitValue(SysYParser::ArrayInitValueContext *ctx) override {
-    os << '{';
-    auto values = ctx->initValue();
-    if (values.size())
-      interleave(values, ", ");
-    os << '}';
+  virtual std::any visitInitValue(SysYParser::InitValueContext *ctx) override {
+    if (not ctx->exp()) {
+      os << '{';
+      auto values = ctx->initValue();
+      if (values.size())
+        interleave(values, ", ");
+      os << '}';
+    }
     return 0;
   }
 
@@ -191,8 +192,7 @@ public:
 
   virtual std::any
   visitContinueStmt(SysYParser::ContinueStmtContext *ctx) override {
-    space() << ctx->CONTINUE()->getText() << ';'
-            << '\n';
+    space() << ctx->CONTINUE()->getText() << ';' << '\n';
     return 0;
   }
 
@@ -235,13 +235,15 @@ public:
     return 0;
   }
 
-//   virtual std::any visitLValueExp(SysYParser::LValueExpContext *ctx) override {
-//     return visitChildren(ctx);
-//   }
+  //   virtual std::any visitLValueExp(SysYParser::LValueExpContext *ctx)
+  //   override {
+  //     return visitChildren(ctx);
+  //   }
 
-//   virtual std::any visitNumberExp(SysYParser::NumberExpContext *ctx) override {
-//     return visitChildren(ctx);
-//   }
+  //   virtual std::any visitNumberExp(SysYParser::NumberExpContext *ctx)
+  //   override {
+  //     return visitChildren(ctx);
+  //   }
 
   virtual std::any visitAndExp(SysYParser::AndExpContext *ctx) override {
     ctx->exp(0)->accept(this);
@@ -275,9 +277,9 @@ public:
     return 0;
   }
 
-//   virtual std::any visitCallExp(SysYParser::CallExpContext *ctx) override {
-//     return visitChildren(ctx);
-//   }
+  //   virtual std::any visitCallExp(SysYParser::CallExpContext *ctx) override {
+  //     return visitChildren(ctx);
+  //   }
 
   virtual std::any
   visitAdditiveExp(SysYParser::AdditiveExpContext *ctx) override {
@@ -332,7 +334,7 @@ public:
   visitFuncRParams(SysYParser::FuncRParamsContext *ctx) override {
     interleave(ctx->exp(), ", ");
     return 0;
-  }*/
+  }
 };
 
 } // namespace sysy
