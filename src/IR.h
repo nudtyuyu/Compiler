@@ -761,8 +761,8 @@ public:
 //! IR unit for representing a SysY compile unit
 class Module {
 protected:
-  std::map<std::string, std::unique_ptr<Function>> functions;
-  std::map<std::string, std::unique_ptr<GlobalValue>> globals;
+  std::map<std::string, Function*> functions;
+  std::map<std::string, GlobalValue*> globals;
   std::map<std::string, int> integers;
   std::map<std::string, float> floats;
   std::map<std::string, std::unique_ptr<InitList>> initLists;
@@ -787,7 +787,7 @@ public:
     auto result = functions.try_emplace(name, new Function(this, type, name));
     if (not result.second)
       return nullptr;
-    return result.first->second.get();
+    return result.first->second;
   };
   GlobalValue *createGlobalValue(const std::string &name, Type *type,
                                  const std::vector<Value *> &dims = {}) {
@@ -795,7 +795,7 @@ public:
         globals.try_emplace(name, new GlobalValue(this, type, name, dims));
     if (not result.second)
       return nullptr;
-    return result.first->second.get();
+    return result.first->second;
   }
   InitList *createInitList(const std::string &name) {
     auto result = initLists.try_emplace(name, new InitList(this, name));
@@ -807,7 +807,7 @@ public:
     auto result = functions.find(name);
     if (result == functions.end())
       return nullptr;
-    return result->second.get();
+    return result->second;
   }
   const int* getInteger(const std::string &name) const {
     auto result = integers.find(name);
@@ -825,11 +825,21 @@ public:
     auto result = globals.find(name);
     if (result == globals.end())
       return nullptr;
-    return result->second.get();
+    return result->second;
   }
 
 public:
   void generateCode(std::ostream &out) const;
+
+public:
+  void print(std::ostream &os) const;
+public:
+  std::map<std::string, Function *> *getFunctions(){
+    return &functions;
+  }
+  std::map<std::string, GlobalValue *> *getGlobalValues(){
+    return &globals;
+  }
 }; // class Module
 
 /*!

@@ -39,6 +39,10 @@ public:
     Value *getElementPtr(AllocaInst *base, std::vector<Value *> indices);
 
 public:
+  Module *get() const { return module.get(); }
+
+
+public:
     virtual std::any visitCompUnit(SysYParser::CompUnitContext *context) override;
 
     virtual std::any visitDecl(SysYParser::DeclContext *context) override;
