@@ -209,6 +209,25 @@ namespace backend{
         case Instruction::kAdd :
         case Instruction::kMul :
         case Instruction::kSub :
+        case Instruction::kDiv :
+        case Instruction::kRem :
+        case Instruction::kAnd :
+        case Instruction::kOr  :
+        case Instruction::kICmpEQ :
+    	case Instruction::kICmpNE :
+    	case Instruction::kICmpLT :
+    	case Instruction::kICmpGT :
+    	case Instruction::kICmpLE :
+    	case Instruction::kICmpGE :
+    	case Instruction::kFAdd   :
+    	case Instruction::kFSub   :
+    	case Instruction::kFMul :
+    	case Instruction::kFDiv :
+   	case Instruction::kFRem :
+    	case Instruction::kFCmpEQ :
+    	case Instruction::kFCmpNE :
+    	case Instruction::kFCmpLT :
+    	case Instruction::kFCmpGT :
         {
             BinaryInst *bInst = dynamic_cast<BinaryInst *>(instr);
             //registers are used only for instruction operation, consider use which register (any one that is free for use)
@@ -216,6 +235,21 @@ namespace backend{
             code += tmp.second;
             dstRegId = tmp.first;
             break;
+        }
+        //Unary Inst
+        case Instruction::kPos :
+        case Instruction::kNeg :
+    	case Instruction::kNot :
+    	case Instruction::kFPos :
+    	case Instruction::kFNeg :
+    	case Instruction::kFtoI :
+    	case Instruction::kIToF :
+        {
+        	UnaryInst *uInst = dynamic_cast<UnaryInst *>(instr);
+        	tmp = unaryInst_gen(uInst,RegManager::RANY);
+        	code+= tmp.second;
+        	dstRegId = tmp.first;
+        	break;
         }
         case Instruction::kLoad :
         {
