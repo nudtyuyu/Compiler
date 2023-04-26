@@ -170,10 +170,16 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 			}
 			auto *alloca = builder.createAllocaInst(type,dims,name);
 			if(type->isInt())
+			{
 				arrayTable.insert(name,AEntry(alloca,name,iDims,true,true));
+				if(GlobalVal)
+					module->createGlobalValue(name,type,dims);
+			}
 			else if(type->isFloat())
 			{
 				arrayTable.insert(name,AEntry(alloca,name,iDims,true,false));
+				if(GlobalVal)
+					module->createGlobalValue(name,type,dims);
 			}
 			
 			//DimNum = dims.size();
@@ -195,6 +201,8 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 				} else {
 					// idata = any_cast<vector <vector<int> > >(getInitValue(value,Dims,1,0));
 					symTable.insert(name, Entry(alloca));
+					if(GlobalVal)
+						module->createGlobalValue(name,type,dims);
 					auto *store = builder.createStoreInst(initVal, alloca);
 				}
 					
@@ -263,6 +271,8 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 			{
 				auto value = any_cast<Value *>(visitConstInitVal(constdef->constInitVal()));
 				symTable.insert(name, Entry(value));
+				if(GlobalVal)
+					module->createGlobalValue(name,type,{});
 				// // cout<<"The Initial Value's Name: "<<value->name<<endl;
 				// auto vvi = module->getInteger(value->name);
 				// auto vvf = module->getFloat(value->name);
@@ -277,6 +287,28 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 				// 	initV2 = *vvf;
 				// }
 				// auto store = builder.createStoreInst(value,alloca);
+			}
+			else
+			{
+				if(type->isInt())
+				{
+					int a = 0;
+					//initV = 0;
+					Value* value = (Value*)ConstantValue::get(a);
+					symTable.insert(name, Entry(value));
+				if(GlobalVal)
+					module->createGlobalValue(name,type,{});
+				}
+				else if(type->isFloat())
+				{
+					float a = 0.0;
+					//initV = 0;
+					Value* value = (Value*)ConstantValue::get(a);
+					symTable.insert(name, Entry(value));
+				if(GlobalVal)
+					module->createGlobalValue(name,type,{});
+				}
+				
 			}
 			// const 声明必须有初值
 			// else
@@ -448,10 +480,15 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 			}
 			auto *alloca = builder.createAllocaInst(type,dims,name);
 			if(type->isInt())
-				arrayTable.insert(name,AEntry(alloca,name,dims,false,true));
+			{	arrayTable.insert(name,AEntry(alloca,name,dims,false,true));
+				if(GlobalVal)
+						module->createGlobalValue(name,type,{});
+			}
 			else if(type->isFloat())
 			{
 				arrayTable.insert(name,AEntry(alloca,name,dims,false,false));
+				if(GlobalVal)
+					module->createGlobalValue(name,type,{});
 			}
 			if(vardef->Assign())
 			{
@@ -500,6 +537,8 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 			}
 			values.push_back(alloca);
 			symTable.insert(name, Entry(alloca));
+			if(GlobalVal)
+				module->createGlobalValue(name,type,{});
 		}
 		
 	}
