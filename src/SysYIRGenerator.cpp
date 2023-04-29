@@ -141,6 +141,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 	// cout<<"visitConstDecl"<<endl;
 	vector <Value*> values;
 	auto type = any_cast<Type*>(visitBType(ctx->bType()));
+	auto *ptype = PointerType::get(type);
 	for(auto constdef:ctx->constDef())
 	{
 		auto name = constdef->Identifier()->getText();
@@ -172,14 +173,12 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 			if(type->isInt())
 			{
 				arrayTable.insert(name,AEntry(alloca,name,iDims,true,true));
-				if(GlobalVal)
-					module->createGlobalValue(name,type,dims);
+				
 			}
 			else if(type->isFloat())
 			{
 				arrayTable.insert(name,AEntry(alloca,name,iDims,true,false));
-				if(GlobalVal)
-					module->createGlobalValue(name,type,dims);
+				
 			}
 			
 			//DimNum = dims.size();
@@ -192,6 +191,8 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 					// array
 					auto *myA = arrayTable.query(name);
 					myA->value = dynamic_cast<InitList *>(initVal);
+					if(GlobalVal)
+						module->createGlobalValue(name,ptype,dims,initVal,true,false);
 					//auto* test = myA->value->getElement({1,1,2});
 					//cout<<test->name<<endl;
 					
@@ -202,7 +203,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 					// idata = any_cast<vector <vector<int> > >(getInitValue(value,Dims,1,0));
 					symTable.insert(name, Entry(alloca));
 					if(GlobalVal)
-						module->createGlobalValue(name,type,dims);
+						module->createGlobalValue(name,ptype,dims,nullptr,true);
 					auto *store = builder.createStoreInst(initVal, alloca);
 				}
 					
@@ -244,6 +245,8 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 				auto *initVal = any_cast<Value *>(GenerateZero(0,name));
 				auto *myA = arrayTable.query(name);
 				myA->value = dynamic_cast<InitList *>(initVal);
+				if(GlobalVal)
+					module->createGlobalValue(name,ptype,{},nullptr,true);
 			}
 			// // cout<<"Put constant array into arrayTable"<<endl;
 			// values.push_back(alloca);
@@ -272,7 +275,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 				auto value = any_cast<Value *>(visitConstInitVal(constdef->constInitVal()));
 				symTable.insert(name, Entry(value));
 				if(GlobalVal)
-					module->createGlobalValue(name,type,{});
+					module->createGlobalValue(name,ptype,{},value,true,false);
 				// // cout<<"The Initial Value's Name: "<<value->name<<endl;
 				// auto vvi = module->getInteger(value->name);
 				// auto vvf = module->getFloat(value->name);
@@ -297,7 +300,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 					Value* value = (Value*)ConstantValue::get(a);
 					symTable.insert(name, Entry(value));
 				if(GlobalVal)
-					module->createGlobalValue(name,type,{});
+					module->createGlobalValue(name,ptype,{},nullptr,true);
 				}
 				else if(type->isFloat())
 				{
@@ -306,7 +309,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 					Value* value = (Value*)ConstantValue::get(a);
 					symTable.insert(name, Entry(value));
 				if(GlobalVal)
-					module->createGlobalValue(name,type,{});
+					module->createGlobalValue(name,ptype,{},nullptr,true);
 				}
 				
 			}
@@ -468,6 +471,7 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 	// cout<<"visitVarDecl"<<endl;
 	vector <Value*> values;
 	auto *type = any_cast<Type *>(visitBType(ctx->bType()));
+	auto *ptype = PointerType::get(type);
 	for(auto *vardef:ctx->varDef())
 	{
 		auto name = vardef->Identifier()->getText();
@@ -481,14 +485,10 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 			auto *alloca = builder.createAllocaInst(type,dims,name);
 			if(type->isInt())
 			{	arrayTable.insert(name,AEntry(alloca,name,dims,false,true));
-				if(GlobalVal)
-						module->createGlobalValue(name,type,{});
 			}
 			else if(type->isFloat())
 			{
 				arrayTable.insert(name,AEntry(alloca,name,dims,false,false));
-				if(GlobalVal)
-					module->createGlobalValue(name,type,{});
 			}
 			if(vardef->Assign())
 			{
@@ -499,6 +499,8 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 				// 这里no要调用AssignArray
 				auto *myA = arrayTable.query(name);
 				myA->value = dynamic_cast<InitList *>(initVal);
+				if(GlobalVal)
+					module->createGlobalValue(name,ptype,dims,initVal,false,false);
 				/*if(type->isInt())
 					arrayTable.insert(name, AEntry(alloca, dynamic_cast<InitList *>(initVal), dims ,false,true));
 				else if(type->isFloat())
@@ -509,6 +511,8 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 				auto *initVal = any_cast<Value *>(GenerateZero(0,name));
 				auto *myA = arrayTable.query(name);
 				myA->value = dynamic_cast<InitList *>(initVal);
+				if(GlobalVal)
+					module->createGlobalValue(name,ptype,dims,nullptr,false);
 			}
 			values.push_back(alloca);
 		}
@@ -522,23 +526,28 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 				// cout<<"getVardefAssignInitVal"<<endl;
 				auto *store = builder.createStoreInst(initVal, alloca);
 				// cout<<"createStoreInst"<<endl;
+				if(GlobalVal)
+					module->createGlobalValue(name,ptype,{},initVal,false,false);
 			}
 			else
 			{
 				if(type->isInt())
 				{
 					auto *store = builder.createStoreInst(ConstantValue::get(0, "0"), alloca);
+					if(GlobalVal)
+						module->createGlobalValue(name,ptype,{},nullptr,false);
 				}
 				else if(type->isFloat())
 				{
 					auto *store = builder.createStoreInst(ConstantValue::get(0.0f, "0.0"), alloca);
+					if(GlobalVal)
+						module->createGlobalValue(name,ptype,{},nullptr,false);
 				}
 			
 			}
 			values.push_back(alloca);
 			symTable.insert(name, Entry(alloca));
-			if(GlobalVal)
-				module->createGlobalValue(name,type,{});
+			
 		}
 		
 	}
@@ -893,7 +902,7 @@ any SysYIRGenerator::visitNumber(SysYParser::NumberContext *ctx)
 		//auto name = ctx->FloatConst()->getText();
 		//auto cv = (Value*)ConstantValue::get(value,name);
 		//// cout<<"mynum: "<<cv->name<<endl;
-		cout<<"vlaue: "<<value<<endl;
+		//cout<<"vlaue: "<<value<<endl;
 		return (Value*)ConstantValue::get(value,ctx->FloatConst()->getText());		
 	}
 	return (Value*)nullptr;

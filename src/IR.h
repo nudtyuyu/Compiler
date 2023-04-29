@@ -679,6 +679,7 @@ public:
 
 
 class Module;
+class InitList;
 //! Function definition
 class Function : public Value {
   friend class Module;
@@ -726,21 +727,47 @@ class GlobalValue : public User {
 protected:
   Module *parent;
   bool hasInit;
+  bool isBss;
+  std::vector<int> Dim;
+  bool isConstant;
+  PointerType* ptype;
 
 protected:
   GlobalValue(Module *parent, Type *type, const std::string &name,
-              const std::vector<Value *> &dims = {}, Value *init = nullptr)
-      : User(type, name), parent(parent), hasInit(init) {
+              const std::vector<Value *> &dims = {}, Value *init = nullptr,bool _isConstant=true,bool _isBss=true)
+      : User(type, name), parent(parent), hasInit(init),isConstant(_isConstant),isBss(_isBss) {
     assert(type->isPointer());
+    ptype = (PointerType*) type;
     addOperands(dims);
     if (init)
       addOperand(init);
+    int length = dims.size();
+    int i=0;
+    for(i=0;i<length;i++)
+    {
+    	auto *value = dynamic_cast<ConstantValue *>(dims[i]);
+        assert(value != nullptr);
+        Dim.push_back(value->getInt());
+    }
   }
 
 public:
-  Value *init() const { return hasInit ? operands.back().getValue() : nullptr; }
-  int getNumDims() const { return getNumOperands() - (hasInit ? 1 : 0); }
+  Value *init() const { //return hasInit ? operands.back().getValue() : nullptr; 
+  	if(hasInit)
+  	{
+  		return operands.back().getValue();
+  	}
+  	else
+  		return nullptr;
+  }
+  int getNumDims() const { //return getNumOperands() - (hasInit ? 1 : 0);
+  	return Dim.size(); 
+  }
   Value *getDim(int index) { return getOperand(index); }
+  int getDimValue(int index) {return Dim[index];}
+  bool IsConst() {return isConstant;}
+  Type *getType() {return ptype->getBaseType();}
+  bool IsBss() {return isBss;}
 }; // class GlobalValue
 
 // class InitList
@@ -790,9 +817,9 @@ public:
     return result.first->second;
   };
   GlobalValue *createGlobalValue(const std::string &name, Type *type,
-                                 const std::vector<Value *> &dims = {}) {
+                                 const std::vector<Value *> &dims = {},Value* initVal=nullptr,bool isConstant=true,bool isBss=true) {
     auto result =
-        globals.try_emplace(name, new GlobalValue(this, type, name, dims));
+        globals.try_emplace(name, new GlobalValue(this, type, name, dims,initVal,isConstant,isBss));
     if (not result.second)
       return nullptr;
     return result.first->second;

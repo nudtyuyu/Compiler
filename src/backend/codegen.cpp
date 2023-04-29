@@ -327,6 +327,73 @@ namespace backend{
         /** 
          *code in here
         */
+        auto globalValues = module->getGlobalValues(); // get the list of the globalValue
+        for(auto iter = globalValues->begin();iter!=globalValues->end();iter++)
+        {
+        	string name = iter->first;
+        	GlobalValue* gb = iter->second;
+        	auto NumDims = gb->getNumDims();
+        	auto type = gb->getType();
+        	int size = 4;
+        	int allSpace = 0;
+        	int i;
+        	int ElementNum = 1;
+        	for(i=0;i<NumDims;i++)
+        	{
+        		auto d = gb->getDimValue(i);
+        		
+        		ElementNum*=d;
+        	}
+        	allSpace= ElementNum*size;
+        	/*if(i==0)
+        	{
+        		allSpace = size;
+        	}*/
+        	char ObjSpace[50];
+        	sprintf(ObjSpace,"%d",allSpace);
+        	asmCode += space + ".global " + name + endl;
+        	if(gb->IsConst())
+        	{
+        		asmCode += space + ".section " + space+".rodata" + endl;
+        	}
+        	if(gb->IsBss())
+        	{
+        		asmCode += space + ".bss" + endl;
+        	}
+        	else
+        	{
+        		asmCode += space + ".data" + endl;
+        	}
+        	asmCode+= space + ".align  " + "2" +endl;
+        	asmCode+= space + ".type   " + name + ","+ " %object"+endl;
+        	asmCode+= space + ".size   " + name + ", " + ObjSpace + endl;
+        	asmCode+= name + ":" +endl;
+        	auto initV = gb->init();
+        	if(initV!=nullptr && !initV->isInitList())
+        	{
+        		auto initv = (ConstantValue*)initV;
+        		if(type->isInt())
+        		{
+        			int number = initv->getInt();
+        			char ObjValue[50];
+        			sprintf(ObjValue,"%d",number);
+        			asmCode+= space + ".word   " + ObjValue +endl;
+        		}
+        		// TODO float???
+        	}
+        	else if(initV==nullptr && gb->IsBss())
+        	{
+        		asmCode+= space + ".space   " + ObjSpace +endl;
+        	}	
+        	else
+        	{
+        		for(int j=0;j<ElementNum;j++)
+        		{
+        			asmCode+= space + ".word    " + "don't know" +endl;
+        		}
+        	}
+        	
+        }
         return asmCode;
     }
 
