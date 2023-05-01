@@ -341,11 +341,12 @@ public:
     value->addUse(&operands.back());
   }
   template <typename ContainerT> void addOperands(const ContainerT &operands) {
-    for (auto value : operands)
+    for(auto value : operands)
       addOperand(value);
   }
   void replaceOperand(int index, Value *value);
   void setOperand(int index, Value *value);
+  void removeOperand(int index);
   const std::string &getName() const { return name; }
 }; // class User
 
@@ -782,7 +783,7 @@ protected:
     User(Type::getInitListType(), name), parent(module) {}
 
 public:
-  Value *getElement(const std::vector<int> &indices);
+  Value *getElement(int index);
 }; // class InitList
 
 //! IR unit for representing a SysY compile unit

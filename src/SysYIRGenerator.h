@@ -24,12 +24,18 @@ public:
     SymTable symTable;
     ArrayTable arrayTable;
     std::vector<int> iDims;
+    std::vector<int> iCounts;
+    //int iCounts;
+    std::vector<int> MyCount;
     int ConstInitListName;
     int InitListName;
+    int nowElement;
     int Layer;// visit initvalue layer for var Array
     int ConstLayer; //visit initvalue layer for const Array
     std::string ArrayName;
     std::string ConstArrayName;
+    int Rows;
+    int Cols;
 
 public:
     SysYIRGenerator() = default;
@@ -123,6 +129,10 @@ public:
     void generateCode(std::ostream &out) const {
         module->generateCode(out);
     }
+    
+    void visitConstInitVal2(SysYParser::ConstInitValContext *ctx,InitList* values);
+    void visitInitVal2(SysYParser::InitValContext *ctx,InitList* values);
+    
     std::any GenerateZero(int Lay, std::string name);
 
     std::string newTemp() {

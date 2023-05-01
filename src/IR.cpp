@@ -144,9 +144,15 @@ void User::replaceOperand(int index, Value *value) {
   use.setValue(value);
 }
 
-Value * InitList::getElement(const std::vector<int> &indices) {
+void User::removeOperand(int index)
+{
+	assert(index<getNumOperands());
+	operands.erase(operands.begin()+index);
+}
+
+Value * InitList::getElement(int index) {
   auto *pList = this;
-  for (auto index : indices) {
+  /*for (auto index : indices) {
     if (index >= pList->getNumOperands())
       return nullptr;
     auto *tmp = pList->getOperand(index);
@@ -155,9 +161,14 @@ Value * InitList::getElement(const std::vector<int> &indices) {
     } else {
       return tmp;
     }
-  }
+  }*/
+  if (index >= pList->getNumOperands())
+      return nullptr;
+  else
+  	return pList->getOperand(index);
+  
 
-  return nullptr;
+  //return nullptr;
 }
 
 CallInst::CallInst(Function *callee, const std::vector<Value *> args,
