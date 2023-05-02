@@ -75,7 +75,7 @@ private:
 
 public:
 	AEntry() = default;
-	AEntry(Value *_base, InitList* _value, std::vector<int> &_dims,bool _isConst,bool _isInt,std::string _name):base(_base), value(_value), dims(_dims),isConst(_isConst),isInt(_isInt),name(_name)
+	AEntry(Value *_base, InitList* _value, std::vector<int> &_dims,bool _isConst,bool _isInt,std::string _name):base(_base), value(_value), dims(_dims),isInt(_isInt),isConst(_isConst),name(_name)
 	{
         // 检查是否越界
         check(value, 0);
@@ -96,7 +96,7 @@ public:
 		// }
 		std::cout<<"Init Finish!"<<std::endl;
 	};
-    AEntry(Value *_base, InitList* _value, std::vector<Value *> &_dims,bool _isConst,bool _isInt,std::string _name):base(_base), value(_value),isConst(_isConst),isInt(_isInt),name(_name)
+    AEntry(Value *_base, InitList* _value, std::vector<Value *> &_dims,bool _isConst,bool _isInt,std::string _name):base(_base), value(_value),isInt(_isInt),isConst(_isConst),name(_name)
 	{
         // 检查是否越界
         for (auto *index : _dims) {
@@ -107,7 +107,7 @@ public:
         check(value, 0);
 		std::cout<<"Init Finish!"<<std::endl;
 	};
-    AEntry(Value* _base,std::string _name,std::vector<int> &_dims,bool _isConst,bool _isInt):base(_base),name(_name),isConst(_isConst),isInt(_isInt)
+    AEntry(Value* _base,std::string _name,std::vector<int> &_dims,bool _isConst,bool _isInt):base(_base),isInt(_isInt),isConst(_isConst),name(_name)
     {
     	int length = _dims.size();
     	dims.clear();
@@ -116,7 +116,7 @@ public:
     		dims.push_back(_dims[i]);
     	}
     };
-    AEntry(Value* _base,std::string _name,std::vector<Value*> &_dims,bool _isConst,bool _isInt):base(_base),name(_name),isConst(_isConst),isInt(_isInt)
+    AEntry(Value* _base,std::string _name,std::vector<Value*> &_dims,bool _isConst,bool _isInt):base(_base),isInt(_isInt),isConst(_isConst),name(_name)
     {
     	int length = _dims.size();
     	dims.clear();

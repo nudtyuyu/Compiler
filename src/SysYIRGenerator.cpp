@@ -215,7 +215,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 				auto *myA = arrayTable.query(name);
 				myA->value = dynamic_cast<InitList *>(initVal);					
 				if(GlobalVal)
-				module->createGlobalValue(name,ptype,dims,initVal,true,false);
+					module->createGlobalValue(name,ptype,dims,initVal,true,false);
 				auto* test = myA->value->getElement(5);
 				cout<<test->name<<endl;
 				
@@ -386,12 +386,12 @@ any SysYIRGenerator::GenerateZero(int Lay,string name)
 			if(value==nullptr)
 			{
 				// cout<<"constinitval is nullptr!!"<<endl;
-				exit(0);
+				exit(-1);
 			}
 			if(values==nullptr)
 			{
 				// cout<<"initList==nullptr!"<<endl;
-				exit(0);
+				exit(-1);
 			}
 			values->addOperand(value);
 			//count++;
@@ -430,22 +430,20 @@ void SysYIRGenerator::visitConstInitVal2(SysYParser::ConstInitValContext *ctx,In
 		MyCount[ConstLayer]=0;
 		//int nowElement=0;
 		int NumOfInit = ctx->constInitVal().size();
-		int addNum=0;
 		for(int kk=0;kk<NumOfInit;kk++)
 		{
-			auto constinit = ctx->constInitVal(kk);
-			if(constinit->LeftCurlyBracket())
+			auto constInit = ctx->constInitVal(kk);
+			if(constInit->LeftCurlyBracket())
 			{
 				ConstLayer++;
 				MyCount[ConstLayer]=0;
 				nowElement= MyCount[ConstLayer-1];
-				visitConstInitVal2(constinit,values);
+				visitConstInitVal2(constInit,values);
 				//CurlyBracket = true;
 			}
 			else
 			{
-				visitConstInitVal2(constinit,values);
-				addNum++;
+				visitConstInitVal2(constInit,values);
 				if(kk+1<NumOfInit)
 					continue;
 			}
@@ -484,7 +482,7 @@ void SysYIRGenerator::visitConstInitVal2(SysYParser::ConstInitValContext *ctx,In
 					
 				}
 			}
-			if(constinit->LeftCurlyBracket())
+			if(constInit->LeftCurlyBracket())
 			{
 				ConstLayer--;
 				//MyCount[ConstLayer]=0;
@@ -493,7 +491,7 @@ void SysYIRGenerator::visitConstInitVal2(SysYParser::ConstInitValContext *ctx,In
 			if(values==nullptr)
 			{
 					// cout<<"initList==nullptr!"<<endl;
-				exit(0);
+				exit(-1);
 			}
 			//values->addOperand(value);
 			//count++;
@@ -550,20 +548,20 @@ any SysYIRGenerator::visitConstInitVal(SysYParser::ConstInitValContext *ctx)
 		ConstInitListName+=1;
 		// cout<<"constInitValSize: "<<ctx->constInitVal().size()<<endl;
 		int count=0;
-		for(auto constinit:ctx->constInitVal())
+		for(auto constInit:ctx->constInitVal())
 		{
 			ConstLayer++;
-			auto *value = any_cast<Value *>(visitConstInitVal(constinit));
+			auto *value = any_cast<Value *>(visitConstInitVal(constInit));
 			ConstLayer--;
 			if(value==nullptr)
 			{
 				// cout<<"constinitval is nullptr!!"<<endl;
-				exit(0);
+				exit(-1);
 			}
 			if(values==nullptr)
 			{
 				// cout<<"initList==nullptr!"<<endl;
-				exit(0);
+				exit(-1);
 			}
 			values->addOperand(value);
 			count++;
@@ -770,22 +768,20 @@ void SysYIRGenerator::visitInitVal2(SysYParser::InitValContext *ctx,InitList* va
 		MyCount[Layer]=0;
 		//int nowElement=0;
 		int NumOfInit = ctx->initVal().size();
-		int addNum=0;
 		for(int kk=0;kk<NumOfInit;kk++)
 		{
-			auto constinit = ctx->initVal(kk);
-			if(constinit->LeftCurlyBracket())
+			auto constInit = ctx->initVal(kk);
+			if(constInit->LeftCurlyBracket())
 			{
 				Layer++;
 				MyCount[Layer]=0;
 				nowElement= MyCount[Layer-1];
-				visitInitVal2(constinit,values);
+				visitInitVal2(constInit,values);
 				//CurlyBracket = true;
 			}
 			else
 			{
-				visitInitVal2(constinit,values);
-				addNum++;
+				visitInitVal2(constInit,values);
 				if(kk+1<NumOfInit)
 					continue;
 			}
@@ -824,7 +820,7 @@ void SysYIRGenerator::visitInitVal2(SysYParser::InitValContext *ctx,InitList* va
 					
 				}
 			}
-			if(constinit->LeftCurlyBracket())
+			if(constInit->LeftCurlyBracket())
 			{
 				Layer--;
 				//MyCount[ConstLayer]=0;
@@ -832,8 +828,8 @@ void SysYIRGenerator::visitInitVal2(SysYParser::InitValContext *ctx,InitList* va
 			}
 			if(values==nullptr)
 			{
-					// cout<<"initList==nullptr!"<<endl;
-				exit(0);
+				// cout<<"initList==nullptr!"<<endl;
+				exit(-1);
 			}
 			//values->addOperand(value);
 			//count++;
@@ -899,7 +895,7 @@ any SysYIRGenerator::visitInitVal(SysYParser::InitValContext *ctx)
 			if(initval==nullptr)
 			{
 				// cout<<"initval is nullptr!!"<<endl;
-				exit(0);
+				exit(-1);
 			}
 			initList->addOperand(initval);
 			count++;
@@ -1354,7 +1350,6 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 				if(vp!=nullptr)
 				{
 					int v = *vp;
-					v = v;
 					module->createInteger(name,v);
 				}
 				auto *unary = builder.createPosInst(term,newTemp());
@@ -1403,7 +1398,6 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 				if(vp!=nullptr)
 				{
 					float v = *vp;
-					v = v;
 					module->createFloat(name,v);
 				}
 				auto *unary = builder.createFPosInst(term,newTemp());

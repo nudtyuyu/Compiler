@@ -170,7 +170,7 @@ public:
   int getIndex() const { return index; }
   User *getUser() const { return user; }
   Value *getValue() const { return value; }
-  void setValue(Value *value) { value = value; }
+  void setValue(Value *val) { value = val; }
 }; // class Use
 
 //! The base class of all value types
@@ -183,7 +183,7 @@ public:
 
 protected:
   Value(Type *type, const std::string &name = "")
-      : type(type), name(name), uses() {}
+      : type(type), uses(), name(name) {}
   virtual ~Value() {}
 
 public:
@@ -736,7 +736,7 @@ protected:
 protected:
   GlobalValue(Module *parent, Type *type, const std::string &name,
               const std::vector<Value *> &dims = {}, Value *init = nullptr,bool _isConstant=true,bool _isBss=true)
-      : User(type, name), parent(parent), hasInit(init),isConstant(_isConstant),isBss(_isBss) {
+      : User(type, name), parent(parent), hasInit(init),isBss(_isBss),isConstant(_isConstant) {
     assert(type->isPointer());
     ptype = (PointerType*) type;
     addOperands(dims);

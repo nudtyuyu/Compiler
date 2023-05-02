@@ -223,7 +223,7 @@ namespace backend{
     	case Instruction::kFSub   :
     	case Instruction::kFMul :
     	case Instruction::kFDiv :
-   	case Instruction::kFRem :
+   	    case Instruction::kFRem :
     	case Instruction::kFCmpEQ :
     	case Instruction::kFCmpNE :
     	case Instruction::kFCmpLT :
@@ -332,8 +332,8 @@ namespace backend{
         {
         	string name = iter->first;
         	GlobalValue* gb = iter->second;
-        	auto NumDims = gb->getNumDims();
-        	auto type = gb->getType();
+        	int NumDims = gb->getNumDims();
+        	Type *type = gb->getType();
         	int size = 4;
         	int allSpace = 0;
         	int i;
