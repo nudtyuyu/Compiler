@@ -332,8 +332,8 @@ namespace backend{
         {
         	string name = iter->first;
         	GlobalValue* gb = iter->second;
-        	int NumDims = gb->getNumDims();
-        	Type *type = gb->getType();
+        	auto NumDims = gb->getNumDims();
+        	auto type = gb->getType();
         	int size = 4;
         	int allSpace = 0;
         	int i;
@@ -351,22 +351,26 @@ namespace backend{
         	}*/
         	char ObjSpace[50];
         	sprintf(ObjSpace,"%d",allSpace);
-        	asmCode += space + ".global " + name + endl;
+        	asmCode += space + ".global  " + name + endl;
         	if(gb->IsConst())
         	{
         		asmCode += space + ".section " + space+".rodata" + endl;
         	}
-        	if(gb->IsBss())
+        	else if(gb->IsBss())
         	{
         		asmCode += space + ".bss" + endl;
+        	}
+        	else if(gb->IsHalf())
+        	{
+        		;
         	}
         	else
         	{
         		asmCode += space + ".data" + endl;
         	}
-        	asmCode+= space + ".align  " + "2" +endl;
-        	asmCode+= space + ".type   " + name + ","+ " %object"+endl;
-        	asmCode+= space + ".size   " + name + ", " + ObjSpace + endl;
+        	asmCode+= space + ".align   " + "2" +endl;
+        	asmCode+= space + ".type    " + name + ","+ " %object"+endl;
+        	asmCode+= space + ".size    " + name + ", " + ObjSpace + endl;
         	asmCode+= name + ":" +endl;
         	auto initV = gb->init();
         	if(initV!=nullptr && !initV->isInitList())
@@ -387,9 +391,31 @@ namespace backend{
         	}	
         	else
         	{
+        		auto initv = (InitList*)initV;
+        		int numZero;
         		for(int j=0;j<ElementNum;j++)
         		{
-        			asmCode+= space + ".word    " + "don't know" +endl;
+        			auto element = initv->getElement(j);
+        			numZero = 0;
+        			while(element->name=="0")
+        			{
+        				numZero++;
+        				j++;
+        				if(j>=ElementNum)
+        					break;
+        				element = initv->getElement(j);
+        			}
+        			if(numZero>0)
+        			{
+        				int zero = numZero*4;
+        				char ZeroSpace[50];
+        				sprintf(ZeroSpace,"%d",zero);
+        				asmCode+= space + ".space   " + ZeroSpace + endl;
+        				if(j<ElementNum)
+        					asmCode+= space + ".word    " + element->name +endl;
+        			}
+        			else
+        				asmCode+= space + ".word    " + element->name +endl;
         		}
         	}
         	

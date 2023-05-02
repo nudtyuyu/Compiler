@@ -729,14 +729,15 @@ protected:
   Module *parent;
   bool hasInit;
   bool isBss;
-  std::vector<int> Dim;
   bool isConstant;
+  bool isHalf;
+  std::vector<int> Dim;
   PointerType* ptype;
 
 protected:
   GlobalValue(Module *parent, Type *type, const std::string &name,
-              const std::vector<Value *> &dims = {}, Value *init = nullptr,bool _isConstant=true,bool _isBss=true)
-      : User(type, name), parent(parent), hasInit(init),isBss(_isBss),isConstant(_isConstant) {
+              const std::vector<Value *> &dims = {}, Value *init = nullptr,bool _isConstant=true,bool _isBss=true,bool _isHalf=false)
+      : User(type, name), parent(parent), hasInit(init),isBss(_isBss),isConstant(_isConstant),isHalf(_isHalf) {
     assert(type->isPointer());
     ptype = (PointerType*) type;
     addOperands(dims);
@@ -769,6 +770,7 @@ public:
   bool IsConst() {return isConstant;}
   Type *getType() {return ptype->getBaseType();}
   bool IsBss() {return isBss;}
+  bool IsHalf() {return isHalf;}
 }; // class GlobalValue
 
 // class InitList
@@ -818,9 +820,9 @@ public:
     return result.first->second;
   };
   GlobalValue *createGlobalValue(const std::string &name, Type *type,
-                                 const std::vector<Value *> &dims = {},Value* initVal=nullptr,bool isConstant=true,bool isBss=true) {
+                                 const std::vector<Value *> &dims = {},Value* initVal=nullptr,bool isConstant=true,bool isBss=true,bool isHalf=false) {
     auto result =
-        globals.try_emplace(name, new GlobalValue(this, type, name, dims,initVal,isConstant,isBss));
+        globals.try_emplace(name, new GlobalValue(this, type, name, dims,initVal,isConstant,isBss,isHalf));
     if (not result.second)
       return nullptr;
     return result.first->second;

@@ -210,14 +210,20 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 				sprintf(Name,"ConstInitName%d",ConstInitListName);
 				auto *initVal = module->createInitList(Name);
 				ConstInitListName+=1;
+				HalfInit=false;
 				visitConstInitVal2(constdef->constInitVal(),initVal);
 					// array
 				auto *myA = arrayTable.query(name);
 				myA->value = dynamic_cast<InitList *>(initVal);					
 				if(GlobalVal)
-					module->createGlobalValue(name,ptype,dims,initVal,true,false);
-				auto* test = myA->value->getElement(5);
-				cout<<test->name<<endl;
+				{
+					if(HalfInit)
+						module->createGlobalValue(name,ptype,dims,initVal,true,false,true);
+					else
+						module->createGlobalValue(name,ptype,dims,initVal,true,false,false);
+				}
+				//auto* test = myA->value->getElement(5);
+				//cout<<test->name<<endl;
 				
 			}
 			else
@@ -245,7 +251,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 				auto *myA = arrayTable.query(name);
 				myA->value = dynamic_cast<InitList *>(initVal);
 				if(GlobalVal)
-					module->createGlobalValue(name,ptype,{},nullptr,true);
+					module->createGlobalValue(name,ptype,dims,nullptr,true,true,false);
 			}
 			// // cout<<"Put constant array into arrayTable"<<endl;
 			// values.push_back(alloca);
@@ -275,7 +281,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 				
 				symTable.insert(name, Entry(value));
 				if(GlobalVal)
-					module->createGlobalValue(name,ptype,{},value,true,false);
+					module->createGlobalValue(name,ptype,{},value,true,false,false);
 				// // cout<<"The Initial Value's Name: "<<value->name<<endl;
 				// auto vvi = module->getInteger(value->name);
 				// auto vvf = module->getFloat(value->name);
@@ -300,7 +306,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 					Value* value = (Value*)ConstantValue::get(a);
 					symTable.insert(name, Entry(value));
 				if(GlobalVal)
-					module->createGlobalValue(name,ptype,{},nullptr,true);
+					module->createGlobalValue(name,ptype,{},nullptr,true,true,false);
 				}
 				else if(type->isFloat())
 				{
@@ -309,7 +315,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 					Value* value = (Value*)ConstantValue::get(a);
 					symTable.insert(name, Entry(value));
 				if(GlobalVal)
-					module->createGlobalValue(name,ptype,{},nullptr,true);
+					module->createGlobalValue(name,ptype,{},nullptr,true,true,false);
 				}
 				
 			}
@@ -458,7 +464,7 @@ void SysYIRGenerator::visitConstInitVal2(SysYParser::ConstInitValContext *ctx,In
 				}
 				else if(tmpm<goal)
 				{
-			
+					HalfInit = true;
 					for(int l=tmpm+1;l<=goal;l++)
 					{
 						if(isInt)
@@ -509,7 +515,7 @@ void SysYIRGenerator::visitConstInitVal2(SysYParser::ConstInitValContext *ctx,In
 			}
 			else if(tmpm<goal)
 			{
-			
+				HalfInit = true;
 				for(int l=tmpm+1;l<=goal;l++)
 				{
 					if(isInt)
@@ -660,15 +666,21 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 				sprintf(Name,"InitName%d",InitListName);
 				auto *initVal = module->createInitList(Name);
 				InitListName+=1;
+				HalfInit = false;
 				visitInitVal2(vardef->initVal(),initVal);
 				//assert(initVal->getType() == Type::getInitListType());
 				// 这里no要调用AssignArray
 				auto *myA = arrayTable.query(name);
 				myA->value = dynamic_cast<InitList *>(initVal);
 				if(GlobalVal)
-					module->createGlobalValue(name,ptype,dims,initVal,false,false);
-				auto* test = myA->value->getElement(21);
-				cout<<test->name<<endl;
+				{
+					if(HalfInit)
+						module->createGlobalValue(name,ptype,dims,initVal,false,false,true);
+					else
+						module->createGlobalValue(name,ptype,dims,initVal,false,false,false);
+				}
+				//auto* test = myA->value->getElement(21);
+				//cout<<test->name<<endl;
 				/*if(type->isInt())
 					arrayTable.insert(name, AEntry(alloca, dynamic_cast<InitList *>(initVal), dims ,false,true));
 				else if(type->isFloat())
@@ -699,7 +711,7 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 				auto *myA = arrayTable.query(name);
 				myA->value = dynamic_cast<InitList *>(initVal);
 				if(GlobalVal)
-					module->createGlobalValue(name,ptype,dims,nullptr,false);
+					module->createGlobalValue(name,ptype,dims,nullptr,false,true,false);
 			}
 			values.push_back(alloca);
 		}
@@ -796,7 +808,7 @@ void SysYIRGenerator::visitInitVal2(SysYParser::InitValContext *ctx,InitList* va
 				}
 				else if(tmpm<goal)
 				{
-			
+					HalfInit = true;
 					for(int l=tmpm+1;l<=goal;l++)
 					{
 						if(isInt)
@@ -847,7 +859,7 @@ void SysYIRGenerator::visitInitVal2(SysYParser::InitValContext *ctx,InitList* va
 			}
 			else if(tmpm<goal)
 			{
-			
+				HalfInit = true;
 				for(int l=tmpm+1;l<=goal;l++)
 				{
 					if(isInt)

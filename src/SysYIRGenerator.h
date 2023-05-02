@@ -21,6 +21,7 @@ private:
 public:
     bool GlobalVal;
     bool LocalVal;
+    bool HalfInit;
     SymTable symTable;
     ArrayTable arrayTable;
     std::vector<int> iDims;
