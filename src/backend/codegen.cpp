@@ -384,6 +384,25 @@ namespace backend{
         			asmCode+= space + ".word   " + ObjValue +endl;
         		}
         		// TODO float???
+        		else if(type->isFloat())
+        		{
+        			float number = initv->getFloat();
+        			//char *nump =(char*)malloc(sizeof(char));
+        			void*nump = &number;
+        			char bytes[4];
+        			for(int ii=0;ii<4;ii++)
+        			{
+        				bytes[ii] = ((char*)nump)[ii];
+        			}
+        			//int *nump = (int*)malloc(sizeof(int));
+        			//*nump = number;
+        			char ObjValue[50];
+        			//int *mynum = bytes;
+        			void*mynum = bytes;
+        			sprintf(ObjValue,"%d",*(int*)mynum);
+        			asmCode+= space + ".word   " + ObjValue +endl;
+        			
+        		}
         	}
         	else if(initV==nullptr && gb->IsBss())
         	{
