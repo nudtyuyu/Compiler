@@ -24,8 +24,9 @@
 #include <set>
 #include <iostream>
 #include <algorithm>
-#include <IR.h>
 #include <vector>
+
+#include <IR.h>
 
 using namespace sysy;
 using std::string;

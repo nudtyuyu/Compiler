@@ -1,4 +1,5 @@
 #include "codegen.hpp"
+#include <string>
 
 namespace backend{
     using RegId = RegManager::RegId;
@@ -72,9 +73,35 @@ namespace backend{
      * */
    string CodeGen::prologueCode_gen(Function *func){
         string code;
-        /** 
-         *code in here
-        */
+        int spOffset = 0;
+        
+        // preserve callee-saved registers (R4-R8, R10, fp, lr)
+        code += space + "push   {fp, lr}\n";
+        code += space + "add    fp, sp, #4\n";
+        spOffset = -4;
+        // 此处代码待优化：仅保存使用过的变量寄存器
+        code += space + "push   {r4, r5, r6, r7, r8, r10}\n";
+        spOffset += -4 * 6;
+        // 此处代码待补充：为局部变量分配空间
+        // code += space + "sub    sp, sp, #x";
+        // arguments & return value (4 bytes)
+        auto arguments = func->getEntryBlock()->getArguments();
+        code += space + "sub    sp, sp, #" + to_string(std::min(4ul, arguments.size()) * 4) + "\n";
+        for (int i = 0; i < arguments.size(); ++i) {
+            if (i < 4) {
+                paramsStOffset[arguments[i]] = spOffset;
+                spOffset -= 4;
+                code += space + "str    " + regm.toString(RegId(i)) + ", [fp, #" + to_string(spOffset) + "]\n";
+            } else {
+                paramsStOffset[arguments[i]] = (i - 3) * 4;
+            }
+        }
+        if (!func->getReturnType()->isVoid()) {
+            retValueStOffset = spOffset;
+            spOffset -= 4;
+            code += space + "sub    sp, sp, #4\n";
+        }
+
         return code;
    }
 
@@ -86,9 +113,13 @@ namespace backend{
     */
     string CodeGen::epilogueCode_gen(Function *func){
         string code;
-        /** 
-         *code in here
-        */
+        
+        // 释放空间(局部变量、函数实参等)
+        code += space + "sub    sp, fp, #28\n";
+        // 此处代码待优化：仅恢复使用过的变量寄存器
+        code += space + "pop    {r4, r5, r6, r7, r8, r10}\n";
+        code += space + "pop    {fp, lr}\n";
+        code += space + "bx     lr\n";
         return code;
     }
 
