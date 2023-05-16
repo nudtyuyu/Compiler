@@ -278,7 +278,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 			if(constdef->Assign())
 			{
 				auto value = any_cast<Value *>(visitConstInitVal(constdef->constInitVal()));
-				
+				auto *store = builder.createStoreInst(value, alloca);
 				symTable.insert(name, Entry(value));
 				if(GlobalVal)
 					module->createGlobalValue(name,ptype,{},value,true,false,false);
@@ -304,6 +304,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 					int a = 0;
 					//initV = 0;
 					Value* value = (Value*)ConstantValue::get(a);
+					auto *store = builder.createStoreInst(value, alloca);
 					symTable.insert(name, Entry(value));
 				if(GlobalVal)
 					module->createGlobalValue(name,ptype,{},nullptr,true,true,false);
@@ -313,6 +314,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 					float a = 0.0;
 					//initV = 0;
 					Value* value = (Value*)ConstantValue::get(a);
+					auto *store = builder.createStoreInst(value, alloca);
 					symTable.insert(name, Entry(value));
 				if(GlobalVal)
 					module->createGlobalValue(name,ptype,{},nullptr,true,true,false);
