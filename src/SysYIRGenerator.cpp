@@ -2,6 +2,7 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <string>
 #include <utility>
 #include <vector>
 #include <cstdio>
@@ -30,77 +31,6 @@ Value *SysYIRGenerator::getElementPtr(AllocaInst *base, std::vector<Value *> ind
 	return ptr;
 }
 
-// any getInitValues(vector<vector<Value*> >Values,vector<int>Dims,int dim,int flag)
-// {
-// 	if(dim==Dims.size())
-// 	{
-// 		int exist = Values.size();
-// 		vector <int> InitValue;
-// 		vector <float> InitValue2;
-// 		for(int i=0;i<exist;i++)
-// 		{
-// 			if(flag==0)
-// 			{
-// 				auto *v = module->getInteger(Values[i]->name);
-// 				InitValue.push_back(*v);
-				
-// 			}
-// 			else if(flag==1)
-// 			{
-// 				auto *v = module->getFloat(Values[i]->name);
-// 				InitValue2.push_back(*v);
-// 			}
-			
-// 		}
-// 		if(exist<Dims[dim-1])
-// 		{
-// 			int number = Dims[dim-1];
-// 			for(int i=exist;i<=number;i++)
-// 			{
-// 				if(flag==0)
-// 				{
-				
-// 					InitValue.push_back(0);
-// 					return InitValue;
-				
-// 				}
-// 				else if(flag==1)
-// 				{
-				
-// 					InitValue2.push_back(0);
-// 					return InitValue2;
-// 				}
-// 			}
-// 		}
-// 	}
-// 	else
-// 	{
-// 		vector <vector<int> > InitValue;
-// 		vector <vector<float> > InitValue2;
-// 		int L = Dims[dim-1];
-// 		for(int i=0;i<L;i++)
-// 		{
-// 			if(flag==0)
-// 			{
-// 				auto res = any_cast<vector<int> >(AssignArray(Values[i],Dims,dim+1));
-// 				InitValue.push_back(res);
-// 				return InitValue;
-// 			}
-// 			else if(flag==1)
-// 			{
-// 				auto res = any_cast<vector<float> >(AssignArray(Values[i],Dims,dim+1));
-// 				InitValue2.push_back(res);
-// 				return InitValue2;
-// 			}
-			
-// 		}
-// 	}
-// 	return nullptr;
-	
-// }
-
-
-
 any SysYIRGenerator::visitCompUnit(SysYParser::CompUnitContext *ctx)
 {
 	auto Unit = new Module;
@@ -108,15 +38,16 @@ any SysYIRGenerator::visitCompUnit(SysYParser::CompUnitContext *ctx)
 	module.reset(Unit);
 	ConstInitListName = 0;
 	InitListName = 0;
-	symTable.newTable();
-	arrayTable.newTable();
+
 	for(auto decl:ctx->decl())
 	{
-		GlobalVal  = true;
+		globalScope  = true;
 		visitDecl(decl);
+		globalScope = false;
 	}
-	for (auto *func : ctx->funcDef())
+	for (auto *func : ctx->funcDef()) {
 		visitFuncDef(func);
+	}
 	
 	return nullptr;
 }
@@ -125,420 +56,237 @@ any SysYIRGenerator::visitCompUnit(SysYParser::CompUnitContext *ctx)
 any SysYIRGenerator::visitDecl(SysYParser::DeclContext *ctx)
 {
 	auto decl = (ctx->constDecl())?visitConstDecl(ctx->constDecl()):visitVarDecl(ctx->varDecl());
-	GlobalVal = false;
-	LocalVal = false;
 	return (decl);
 }
 
 any SysYIRGenerator::visitBType(SysYParser::BTypeContext *ctx)
 {
-	// cout<<"visitBType"<<endl;
 	return ctx->Int() ? Type::getIntType() : Type::getFloatType();
 }
 
 any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 {
-	// cout<<"visitConstDecl"<<endl;
 	vector <Value*> values;
-	auto type = any_cast<Type*>(visitBType(ctx->bType()));
-	auto *ptype = PointerType::get(type);
-	for(auto constdef:ctx->constDef())
+	auto *type = any_cast<Type*>(visitBType(ctx->bType()));
+	for(auto *constdef:ctx->constDef())
 	{
 		auto name = constdef->Identifier()->getText();
 		vector <Value *> dims;
-		//vector <vector<int> > idata;
-		//vector <vector<float> > fdata;
 		if(!constdef->constExp().empty())
-		{
-			iDims.clear();
-			
-			for(auto constexp:constdef->constExp())
+		{	// array
+			for(auto *constexp:constdef->constExp())
 			{
-				auto dim = any_cast<Value*>(visitConstExp(constexp));
-				auto * dimp = module->getInteger(dim->name);
-				if(dimp!=nullptr)
-				{
-					//Dims.push_back(*dimp);
-					if(dim->isInt())
-					{
-						// cout<<"dim is Int"<<endl;
-						iDims.push_back(*dimp);
-					}
-				}
-				
+				auto *dim = any_cast<ConstantValue*>(visitConstExp(constexp));
+				assert(dim->isInt());
 				dims.push_back(dim);
-			
 			}
-			//Rows = iDims[0];
-			//Cols = 1;
-			int tmplength = iDims.size();
-			for(int l=1;l<tmplength;l++)
-			{
-				Cols*=iDims[l];
+			auto *initValue = std::any_cast<Value *>(visitConstInitVal(constdef->constInitVal()));
+			if(globalScope) {
+				auto *globalValue = module->createGlobalValue(name, type, dims, initValue, true);
+				builder.getSymTable()->insert(name, globalValue, dims, initValue, true);
 			}
-			MyCount.clear();
-			iCounts.clear();
-			//iCounts.push_back(1);
-			int tmpC = 1;
-			//int iCouC = 1;
-			//iCounts = 1;
-			for(int l=tmplength-1;l>=0;l--)
-			{
-				tmpC*=iDims[l];
-				iCounts.push_back(tmpC);
-				MyCount.push_back(0);
+			else {
+				auto *allocaInst = builder.createAllocaInst(type, dims, name);
+				builder.getSymTable()->insert(name, allocaInst, dims, initValue, true);
 			}
-			auto *alloca = builder.createAllocaInst(type,dims,name);
-			if(type->isInt())
-			{
-				arrayTable.insert(name,AEntry(alloca,name,iDims,true,true));
-				
-			}
-			else if(type->isFloat())
-			{
-				arrayTable.insert(name,AEntry(alloca,name,iDims,true,false));
-				
-			}
-			
-			//DimNum = dims.size();
-			ConstLayer = 0;
-			ConstArrayName = name;
-			if(constdef->Assign())
-			{
-				//auto *initVal = any_cast<Value *>(visitConstInitVal(constdef->constInitVal()));
-				char Name[40];
-				sprintf(Name,"ConstInitName%d",ConstInitListName);
-				auto *initVal = module->createInitList(Name);
-				ConstInitListName+=1;
-				HalfInit=false;
-				visitConstInitVal2(constdef->constInitVal(),initVal);
-					// array
-				auto *myA = arrayTable.query(name);
-				myA->value = dynamic_cast<InitList *>(initVal);					
-				if(GlobalVal)
-				{
-					if(HalfInit)
-						module->createGlobalValue(name,ptype,dims,initVal,true,false,true);
-					else
-						module->createGlobalValue(name,ptype,dims,initVal,true,false,false);
-				}
-				//auto* test = myA->value->getElement(5);
-				//cout<<test->name<<endl;
-				
-			}
-			else
-			{
-				//auto *initVal = any_cast<Value *>(GenerateZero(0,name));
-				char Name[40];
-				sprintf(Name,"ConstInitName%d",ConstInitListName);
-				auto *initVal = module->createInitList(Name);
-				ConstInitListName+=1;
-				int Number=iCounts[tmplength-1];
-				for(int l=0;l<Number;l++)
-				{
-					if(type->isInt())
-					{
-						auto *constzero = (Value*)ConstantValue::get(0,"0");
-						initVal->addOperand(constzero);
-					}
-					else if(type->isFloat())
-					{
-						auto *constzero = (Value*)ConstantValue::get(0.0f,"0.0");
-						initVal->addOperand(constzero);
-			
-					}
-				}
-				auto *myA = arrayTable.query(name);
-				myA->value = dynamic_cast<InitList *>(initVal);
-				if(GlobalVal)
-					module->createGlobalValue(name,ptype,dims,nullptr,true,true,false);
-			}
-			// // cout<<"Put constant array into arrayTable"<<endl;
-			// values.push_back(alloca);
-			// int btype;
-			// if(type->isInt())
-			// {
-			// 	btype = 0;
-			// 	auto data = idata;
-			// 	AEntry entry(alloca,btype,0,dims,data);
-			// 	arrayTable.insert(name,entry);
-			// }
-			// else if(type->isFloat())
-			// {
-			// 	btype = 1;
-			// 	auto data = fdata;
-			// 	AEntry entry(alloca,btype,0,dims,data);
-			// 	arrayTable.insert(name,entry);
-			// }
-			// cout<<"insert arrayTable successfully!"<<endl;
 		}
 		else
 		{
-			auto alloca = builder.createAllocaInst(type,{},name);
-			if(constdef->Assign())
-			{
-				auto value = any_cast<Value *>(visitConstInitVal(constdef->constInitVal()));
-				auto *store = builder.createStoreInst(value, alloca);
-				symTable.insert(name, Entry(value));
-				if(GlobalVal)
-					module->createGlobalValue(name,ptype,{},value,true,false,false);
-				// // cout<<"The Initial Value's Name: "<<value->name<<endl;
-				// auto vvi = module->getInteger(value->name);
-				// auto vvf = module->getFloat(value->name);
-				// if(type->isInt())
-				// {
-				// 	// cout<<"The Initial Value's value: "<<(*vvi)<<endl;
-				// 	initV = *vvi;
-				// }
-				// else if(type->isFloat())
-				// {
-				// 	// cout<<"The Initial Value's value: "<<(*vvf)<<endl;
-				// 	initV2 = *vvf;
-				// }
-				// auto store = builder.createStoreInst(value,alloca);
-			}
-			else
-			{
-				if(type->isInt())
-				{
-					int a = 0;
-					//initV = 0;
-					Value* value = (Value*)ConstantValue::get(a);
-					auto *store = builder.createStoreInst(value, alloca);
-					symTable.insert(name, Entry(value));
-				if(GlobalVal)
-					module->createGlobalValue(name,ptype,{},nullptr,true,true,false);
-				}
-				else if(type->isFloat())
-				{
-					float a = 0.0;
-					//initV = 0;
-					Value* value = (Value*)ConstantValue::get(a);
-					auto *store = builder.createStoreInst(value, alloca);
-					symTable.insert(name, Entry(value));
-				if(GlobalVal)
-					module->createGlobalValue(name,ptype,{},nullptr,true,true,false);
-				}
-				
-			}
-			// const 声明必须有初值
-			// else
-			// {
-			// 	if(type->isInt())
-			// 	{
-			// 		int a = 0;
-			// 		initV = 0;
-			// 		Value* value = (Value*)ConstantValue::get(a);
-			// 		auto store = builder.createStoreInst(value,alloca);
-			// 	}
-			// 	else if(type->isFloat())
-			// 	{
-			// 		initV2 = 0.0;
-			// 		float a = 0.0;
-			// 		Value* value = (Value*)ConstantValue::get(a);
-			// 		auto store = builder.createStoreInst(value,alloca);
-			// 	}
+			auto *initValue = any_cast<Value *>(visitConstInitVal(constdef->constInitVal()));
 			
-			// }
-			// values.push_back(alloca);
-			// if(type->isInt())
-			// {
-			// 	Entry entry(alloca,0,initV);
-			// 	symTable.insert(name,entry);
-			// }
-			// else if(type->isFloat())
-			// {
-			// 	Entry entry(alloca,0,initV2);
-			// 	symTable.insert(name,entry);
-			// }
+			builder.getSymTable()->insert(name, initValue, {}, initValue, true);
+			if(globalScope) {
+				auto *globalValue = module->createGlobalValue(name, type, {}, initValue, true);
+			}
+			builder.getSymTable()->insert(name, initValue, {}, nullptr, true);
 		}
 	}
 	return values;
 }
 
-any SysYIRGenerator::GenerateZero(int Lay,string name)
-{
-	//// cout<<"GenerateConstZero"<<endl;
-	auto *nowArray = arrayTable.query(name);
-	int Num_Layer = nowArray->dims.size();
-	if(Lay>Num_Layer-1)
-		Lay = Num_Layer-1;
-	int num = nowArray->dims[Lay];
-	bool isInt = nowArray->isInt;
-	if(Lay>=Num_Layer-1)
-	{
-		if(isInt)
-		{
-			auto *constzero = (Value*)ConstantValue::get(0,"0");
-			return constzero;
-		}
-		else
-		{
-			auto *constzero = (Value*)ConstantValue::get(0.0f,"0.0");
-			return constzero;
-		}
-		return nullptr;
-	}
-	else
-	{
-		char Name[40];
-		sprintf(Name,"ConstInitName%d",ConstInitListName);
-		auto *values = module->createInitList(Name);
-		ConstInitListName+=1;
+// any SysYIRGenerator::GenerateZero(int Lay,string name)
+// {
+// 	//// cout<<"GenerateConstZero"<<endl;
+// 	auto *nowArray = arrayTable.query(name);
+// 	int Num_Layer = nowArray->dims.size();
+// 	if(Lay>Num_Layer-1)
+// 		Lay = Num_Layer-1;
+// 	int num = nowArray->dims[Lay];
+// 	bool isInt = nowArray->isInt;
+// 	if(Lay>=Num_Layer-1)
+// 	{
+// 		if(isInt)
+// 		{
+// 			auto *constzero = (Value*)ConstantValue::get(0,"0");
+// 			return constzero;
+// 		}
+// 		else
+// 		{
+// 			auto *constzero = (Value*)ConstantValue::get(0.0f,"0.0");
+// 			return constzero;
+// 		}
+// 		return nullptr;
+// 	}
+// 	else
+// 	{
+// 		char Name[40];
+// 		sprintf(Name,"ConstInitName%d",ConstInitListName);
+// 		auto *values = module->createInitList(Name);
+// 		ConstInitListName+=1;
 		
-		for(int i=0;i<num;i++)
-		{
-			//ConstLayer++;
-			auto *value = any_cast<Value *>(GenerateZero(Lay+1,name));
-			//ConstLayer--;
-			if(value==nullptr)
-			{
-				// cout<<"constinitval is nullptr!!"<<endl;
-				exit(-1);
-			}
-			if(values==nullptr)
-			{
-				// cout<<"initList==nullptr!"<<endl;
-				exit(-1);
-			}
-			values->addOperand(value);
-			//count++;
-			//// cout<<"I have addOperandZero"<<endl;
-		}
-		return (Value *)values;
-	}
-	return nullptr;
+// 		for(int i=0;i<num;i++)
+// 		{
+// 			//ConstLayer++;
+// 			auto *value = any_cast<Value *>(GenerateZero(Lay+1,name));
+// 			//ConstLayer--;
+// 			if(value==nullptr)
+// 			{
+// 				// cout<<"constinitval is nullptr!!"<<endl;
+// 				exit(-1);
+// 			}
+// 			if(values==nullptr)
+// 			{
+// 				// cout<<"initList==nullptr!"<<endl;
+// 				exit(-1);
+// 			}
+// 			values->addOperand(value);
+// 			//count++;
+// 			//// cout<<"I have addOperandZero"<<endl;
+// 		}
+// 		return (Value *)values;
+// 	}
+// 	return nullptr;
 	
-}
+// }
 
-void SysYIRGenerator::visitConstInitVal2(SysYParser::ConstInitValContext *ctx,InitList* values)
-{
-	auto *nowArray = arrayTable.query(ConstArrayName);
-	bool isInt = nowArray->isInt;
-	int length = nowArray->dims.size();
-	if(ctx->constExp())
-	{
-		auto *constexp = any_cast<Value *>(visitConstExp(ctx->constExp()));
+// void SysYIRGenerator::visitConstInitVal2(SysYParser::ConstInitValContext *ctx,InitList* values)
+// {
+// 	auto *nowArray = arrayTable.query(ConstArrayName);
+// 	bool isInt = nowArray->isInt;
+// 	int length = nowArray->dims.size();
+// 	if(ctx->constExp())
+// 	{
+// 		auto *constexp = any_cast<Value *>(visitConstExp(ctx->constExp()));
 		
-		/*if(MyCount[ConstLayer]>nowArray->dims[ConstLayer])
-		{
-			cout<<"warning: excess elements in array initializer"<<endl;
-			return;
-		}*/
-		values->addOperand(constexp);
-		//MyCount++;
-		for(int kk=0;kk<=ConstLayer;kk++)
-			MyCount[kk]++;
-		//int eleNum = values->getNumOperands();
-		//return constexp;
-	}
-	else
-	{
-		//int MyCount = 0;
-		MyCount[ConstLayer]=0;
-		//int nowElement=0;
-		int NumOfInit = ctx->constInitVal().size();
-		for(int kk=0;kk<NumOfInit;kk++)
-		{
-			auto constInit = ctx->constInitVal(kk);
-			if(constInit->LeftCurlyBracket())
-			{
-				ConstLayer++;
-				MyCount[ConstLayer]=0;
-				nowElement= MyCount[ConstLayer-1];
-				visitConstInitVal2(constInit,values);
-				//CurlyBracket = true;
-			}
-			else
-			{
-				visitConstInitVal2(constInit,values);
-				if(kk+1<NumOfInit)
-					continue;
-			}
-			if(ConstLayer>0 && nowElement%iCounts[length-ConstLayer-1]==0){
-				int tmpm = MyCount[ConstLayer];
-		//int goal = nowArray->dims[ConstLayer];
-				int goal = iCounts[length-ConstLayer-1];
-				if(tmpm>goal)
-				{
-					cout<<"warning: excess elements in array initializer"<<endl;
-					return;
-				}
-				else if(tmpm<goal)
-				{
-					HalfInit = true;
-					for(int l=tmpm+1;l<=goal;l++)
-					{
-						if(isInt)
-						{
-							auto *constzero = (Value*)ConstantValue::get(0,"0");
-							values->addOperand(constzero);
-							for(int jj=0;jj<=ConstLayer;jj++)
-								MyCount[jj]++;
-							//MyCount[ConstLayer]++;
-						}
-						else
-						{
-							auto *constzero = (Value*)ConstantValue::get(0.0f,"0.0");
-							values->addOperand(constzero);
-							for(int jj=0;jj<=ConstLayer;jj++)
-								MyCount[jj]++;
-							//MyCount[ConstLayer]++;
+// 		/*if(MyCount[ConstLayer]>nowArray->dims[ConstLayer])
+// 		{
+// 			cout<<"warning: excess elements in array initializer"<<endl;
+// 			return;
+// 		}*/
+// 		values->addOperand(constexp);
+// 		//MyCount++;
+// 		for(int kk=0;kk<=ConstLayer;kk++)
+// 			MyCount[kk]++;
+// 		//int eleNum = values->getNumOperands();
+// 		//return constexp;
+// 	}
+// 	else
+// 	{
+// 		//int MyCount = 0;
+// 		MyCount[ConstLayer]=0;
+// 		//int nowElement=0;
+// 		int NumOfInit = ctx->constInitVal().size();
+// 		for(int kk=0;kk<NumOfInit;kk++)
+// 		{
+// 			auto constInit = ctx->constInitVal(kk);
+// 			if(constInit->LeftCurlyBracket())
+// 			{
+// 				ConstLayer++;
+// 				MyCount[ConstLayer]=0;
+// 				nowElement= MyCount[ConstLayer-1];
+// 				visitConstInitVal2(constInit,values);
+// 				//CurlyBracket = true;
+// 			}
+// 			else
+// 			{
+// 				visitConstInitVal2(constInit,values);
+// 				if(kk+1<NumOfInit)
+// 					continue;
+// 			}
+// 			if(ConstLayer>0 && nowElement%iCounts[length-ConstLayer-1]==0){
+// 				int tmpm = MyCount[ConstLayer];
+// 		//int goal = nowArray->dims[ConstLayer];
+// 				int goal = iCounts[length-ConstLayer-1];
+// 				if(tmpm>goal)
+// 				{
+// 					cout<<"warning: excess elements in array initializer"<<endl;
+// 					return;
+// 				}
+// 				else if(tmpm<goal)
+// 				{
+// 					HalfInit = true;
+// 					for(int l=tmpm+1;l<=goal;l++)
+// 					{
+// 						if(isInt)
+// 						{
+// 							auto *constzero = (Value*)ConstantValue::get(0,"0");
+// 							values->addOperand(constzero);
+// 							for(int jj=0;jj<=ConstLayer;jj++)
+// 								MyCount[jj]++;
+// 							//MyCount[ConstLayer]++;
+// 						}
+// 						else
+// 						{
+// 							auto *constzero = (Value*)ConstantValue::get(0.0f,"0.0");
+// 							values->addOperand(constzero);
+// 							for(int jj=0;jj<=ConstLayer;jj++)
+// 								MyCount[jj]++;
+// 							//MyCount[ConstLayer]++;
 			
-						}
-					}
+// 						}
+// 					}
 					
-				}
-			}
-			if(constInit->LeftCurlyBracket())
-			{
-				ConstLayer--;
-				//MyCount[ConstLayer]=0;
-				//CurlyBracket = true;
-			}
-			if(values==nullptr)
-			{
-					// cout<<"initList==nullptr!"<<endl;
-				exit(-1);
-			}
-			//values->addOperand(value);
-			//count++;
-			// cout<<"I have addOperand"<<endl;
-		}
-		if(ConstLayer==0)
-		{
-			int tmpm = MyCount[ConstLayer];
-			//int goal = nowArray->dims[ConstLayer];
-			int goal = iCounts[length-ConstLayer-1];
-			if(tmpm>goal)
-			{
-				cout<<"warning: excess elements in array initializer"<<endl;
-				return;
-			}
-			else if(tmpm<goal)
-			{
-				HalfInit = true;
-				for(int l=tmpm+1;l<=goal;l++)
-				{
-					if(isInt)
-					{
-						auto *constzero = (Value*)ConstantValue::get(0,"0");
-						values->addOperand(constzero);
-						MyCount[ConstLayer]++;
-					}
-					else
-					{
-						auto *constzero = (Value*)ConstantValue::get(0.0f,"0.0");
-						values->addOperand(constzero);
-						MyCount[ConstLayer]++;
+// 				}
+// 			}
+// 			if(constInit->LeftCurlyBracket())
+// 			{
+// 				ConstLayer--;
+// 				//MyCount[ConstLayer]=0;
+// 				//CurlyBracket = true;
+// 			}
+// 			if(values==nullptr)
+// 			{
+// 					// cout<<"initList==nullptr!"<<endl;
+// 				exit(-1);
+// 			}
+// 			//values->addOperand(value);
+// 			//count++;
+// 			// cout<<"I have addOperand"<<endl;
+// 		}
+// 		if(ConstLayer==0)
+// 		{
+// 			int tmpm = MyCount[ConstLayer];
+// 			//int goal = nowArray->dims[ConstLayer];
+// 			int goal = iCounts[length-ConstLayer-1];
+// 			if(tmpm>goal)
+// 			{
+// 				cout<<"warning: excess elements in array initializer"<<endl;
+// 				return;
+// 			}
+// 			else if(tmpm<goal)
+// 			{
+// 				HalfInit = true;
+// 				for(int l=tmpm+1;l<=goal;l++)
+// 				{
+// 					if(isInt)
+// 					{
+// 						auto *constzero = (Value*)ConstantValue::get(0,"0");
+// 						values->addOperand(constzero);
+// 						MyCount[ConstLayer]++;
+// 					}
+// 					else
+// 					{
+// 						auto *constzero = (Value*)ConstantValue::get(0.0f,"0.0");
+// 						values->addOperand(constzero);
+// 						MyCount[ConstLayer]++;
 			
-					}
-				}
-			}
+// 					}
+// 				}
+// 			}
 		
-		}
-	}
-}
+// 		}
+// 	}
+// }
 
 any SysYIRGenerator::visitConstInitVal(SysYParser::ConstInitValContext *ctx)
 {
@@ -550,57 +298,39 @@ any SysYIRGenerator::visitConstInitVal(SysYParser::ConstInitValContext *ctx)
 	}
 	else
 	{
-		char Name[40];
-		sprintf(Name,"ConstInitList%d",ConstInitListName);
-		auto *values = module->createInitList(Name);
-		ConstInitListName+=1;
-		// cout<<"constInitValSize: "<<ctx->constInitVal().size()<<endl;
-		int count=0;
-		for(auto constInit:ctx->constInitVal())
+		std::vector<Value *> values;
+		for(auto *constInitVal:ctx->constInitVal())
 		{
-			ConstLayer++;
-			auto *value = any_cast<Value *>(visitConstInitVal(constInit));
-			ConstLayer--;
-			if(value==nullptr)
-			{
-				// cout<<"constinitval is nullptr!!"<<endl;
-				exit(-1);
-			}
-			if(values==nullptr)
-			{
-				// cout<<"initList==nullptr!"<<endl;
-				exit(-1);
-			}
-			values->addOperand(value);
-			count++;
-			// cout<<"I have addOperand"<<endl;
+			auto *value = any_cast<Value *>(visitConstInitVal(constInitVal));
+			values.push_back(value);
 		}
-		auto *nowArray = arrayTable.query(ConstArrayName);
-		int num = nowArray->dims[ConstLayer];
-		int higher = (ConstLayer+1>=nowArray->dims.size())?ConstLayer+1:nowArray->dims.size()-1;
-		int higherNum = nowArray->dims[higher];
-		bool isInt = nowArray->isInt;
+		auto *initValue = module->createInitList(values);
+		// auto *nowArray = arrayTable.query(ConstArrayName);
+		// int num = nowArray->dims[ConstLayer];
+		// int higher = (ConstLayer+1>=nowArray->dims.size())?ConstLayer+1:nowArray->dims.size()-1;
+		// int higherNum = nowArray->dims[higher];
+		// bool isInt = nowArray->isInt;
 		
-		for(int i=count+1;i<=num;i++)
-		{
-			// cout<<"GenerateConstZero"<<endl;
-			auto *gZero = any_cast<Value*>(GenerateZero(ConstLayer+1,ConstArrayName));
+		// for(int i=count+1;i<=num;i++)
+		// {
+		// 	// cout<<"GenerateConstZero"<<endl;
+		// 	auto *gZero = any_cast<Value*>(GenerateZero(ConstLayer+1,ConstArrayName));
 			
-			values->addOperand(gZero);
-			/*if(isInt)
-			{
-				int z = 0;
-				Value* zero = (Value*)ConstantValue::get(z);
-				values->addOperand(zero);
-			}
-			else
-			{
-				float z = 0.0;
-				Value* zero = (Value*)ConstantValue::get(z);
-				values->addOperand(zero);
-			}*/
-		}
-		return (Value *)values;
+		// 	values->addOperand(gZero);
+		// 	/*if(isInt)
+		// 	{
+		// 		int z = 0;
+		// 		Value* zero = (Value*)ConstantValue::get(z);
+		// 		values->addOperand(zero);
+		// 	}
+		// 	else
+		// 	{
+		// 		float z = 0.0;
+		// 		Value* zero = (Value*)ConstantValue::get(z);
+		// 		values->addOperand(zero);
+		// 	}*/
+		// }
+		return (Value *)initValue;
 	}
 	return nullptr;
 }
@@ -608,281 +338,211 @@ any SysYIRGenerator::visitConstInitVal(SysYParser::ConstInitValContext *ctx)
 
 any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 {
-	// cout<<"visitVarDecl"<<endl;
 	vector <Value*> values;
 	auto *type = any_cast<Type *>(visitBType(ctx->bType()));
-	auto *ptype = PointerType::get(type);
 	for(auto *vardef:ctx->varDef())
 	{
 		auto name = vardef->Identifier()->getText();
 		vector <Value *> dims;
 		if(!vardef->constExp().empty())
-		{
-			iDims.clear();
+		{	// array
 			for(auto constexp:vardef->constExp())
 			{
 				auto dim = any_cast<Value*>(visitConstExp(constexp));
 				dims.push_back(dim);
-				auto * dimp = module->getInteger(dim->name);
-				if(dimp!=nullptr)
-				{
-					//Dims.push_back(*dimp);
-					if(dim->isInt())
-					{
-						// cout<<"dim is Int"<<endl;
-						iDims.push_back(*dimp);
-					}
-				}
-			}
-			int tmplength = iDims.size();
-			for(int l=1;l<tmplength;l++)
-			{
-				Cols*=iDims[l];
-			}
-			MyCount.clear();
-			iCounts.clear();
-			//iCounts.push_back(1);
-			int tmpC = 1;
-			//int iCouC = 1;
-			//iCounts = 1;
-			for(int l=tmplength-1;l>=0;l--)
-			{
-				tmpC*=iDims[l];
-				iCounts.push_back(tmpC);
-				MyCount.push_back(0);
-			}
-			auto *alloca = builder.createAllocaInst(type,dims,name);
-			if(type->isInt())
-			{	arrayTable.insert(name,AEntry(alloca,name,dims,false,true));
-			}
-			else if(type->isFloat())
-			{
-				arrayTable.insert(name,AEntry(alloca,name,dims,false,false));
 			}
 			if(vardef->Assign())
 			{
-				Layer = 0;
-				ArrayName = name;
-				//auto *initVal = any_cast<Value *>(visitInitVal(vardef->initVal()));
-				char Name[40];
-				sprintf(Name,"InitName%d",InitListName);
-				auto *initVal = module->createInitList(Name);
-				InitListName+=1;
-				HalfInit = false;
-				visitInitVal2(vardef->initVal(),initVal);
-				//assert(initVal->getType() == Type::getInitListType());
-				// 这里no要调用AssignArray
-				auto *myA = arrayTable.query(name);
-				myA->value = dynamic_cast<InitList *>(initVal);
-				if(GlobalVal)
+				auto *initValue = any_cast<Value *>(visitInitVal(vardef->initVal()));
+				if(globalScope)
 				{
-					if(HalfInit)
-						module->createGlobalValue(name,ptype,dims,initVal,false,false,true);
-					else
-						module->createGlobalValue(name,ptype,dims,initVal,false,false,false);
+					auto *globalValue = module->createGlobalValue(name, type, dims, initValue, false);
+					builder.getSymTable()->insert(name, globalValue, dims, initValue, false);
+				} else {
+					auto *allocaInst = builder.createAllocaInst(type, dims, name);
+					builder.getSymTable()->insert(name, allocaInst, dims, initValue, false);
+					// 待补充：store数组
 				}
-				//auto* test = myA->value->getElement(21);
-				//cout<<test->name<<endl;
-				/*if(type->isInt())
-					arrayTable.insert(name, AEntry(alloca, dynamic_cast<InitList *>(initVal), dims ,false,true));
-				else if(type->isFloat())
-					arrayTable.insert(name, AEntry(alloca, dynamic_cast<InitList *>(initVal), dims ,false,false));*/
 			}
 			else
 			{
-				//auto *initVal = any_cast<Value *>(GenerateZero(0,name));
-				char Name[40];
-				sprintf(Name,"InitName%d",InitListName);
-				auto *initVal = module->createInitList(Name);
-				InitListName+=1;
-				int Number=iCounts[tmplength-1];
-				for(int l=0;l<Number;l++)
-				{
-					if(type->isInt())
-					{
-						auto *constzero = (Value*)ConstantValue::get(0,"0");
-						initVal->addOperand(constzero);
-					}
-					else if(type->isFloat())
-					{
-						auto *constzero = (Value*)ConstantValue::get(0.0f,"0.0");
-						initVal->addOperand(constzero);
-			
-					}
+				if(globalScope) {
+					auto *globalValue = module->createGlobalValue(name, type, dims, nullptr, false);
+					builder.getSymTable()->insert(name, globalValue, dims, {}, false);
+				} else {	
+					auto *allocaInst = builder.createAllocaInst(type, dims, name);
+					builder.getSymTable()->insert(name, allocaInst, dims, nullptr, false);
 				}
-				auto *myA = arrayTable.query(name);
-				myA->value = dynamic_cast<InitList *>(initVal);
-				if(GlobalVal)
-					module->createGlobalValue(name,ptype,dims,nullptr,false,true,false);
 			}
-			values.push_back(alloca);
 		}
 		else
 		{
-			auto alloca = builder.createAllocaInst(type,{},name);
 			if(vardef->Assign())
 			{
-				auto *initVal = any_cast<Value *>(visitInitVal(vardef->initVal()));
-				// cout<<"The Initial Value's Name: "<<initVal->name<<endl;
-				// cout<<"getVardefAssignInitVal"<<endl;
-				auto *store = builder.createStoreInst(initVal, alloca);
-				// cout<<"createStoreInst"<<endl;
-				if(GlobalVal)
-					module->createGlobalValue(name,ptype,{},initVal,false,false);
+				auto *initValue = any_cast<Value *>(visitInitVal(vardef->initVal()));
+				if(globalScope) {
+					auto *globalValue = module->createGlobalValue(name, type, {}, initValue, false);
+					builder.getSymTable()->insert(name, globalValue, {}, nullptr, false);
+				} else {
+					auto *allocaInst = builder.createAllocaInst(type, {}, name);
+					builder.getSymTable()->insert(name, allocaInst, dims, initValue, false);
+					auto *storeInst = builder.createStoreInst(initValue, allocaInst);
+				}
 			}
 			else
 			{
-				if(type->isInt())
-				{
-					auto *store = builder.createStoreInst(ConstantValue::get(0, "0"), alloca);
-					if(GlobalVal)
-						module->createGlobalValue(name,ptype,{},nullptr,false);
+				if (globalScope) {
+					if(type->isInt())
+					{
+						auto *initValue = ConstantValue::get(0, "0");
+						auto *globalValue = module->createGlobalValue(name, type, {}, nullptr, false);
+						builder.getSymTable()->insert(name, globalValue, {}, nullptr, false);
+					}
+					else if(type->isFloat())
+					{
+						auto *initValue = ConstantValue::get(0.0f, "0.0");
+						auto *globalValue = module->createGlobalValue(name, type, {}, nullptr, false);
+						builder.getSymTable()->insert(name, globalValue, {}, nullptr, false);
+					}
+				} else {
+					auto *allocaInst = builder.createAllocaInst(type, {}, name);
+					builder.getSymTable()->insert(name, allocaInst, {}, nullptr, false);
 				}
-				else if(type->isFloat())
-				{
-					auto *store = builder.createStoreInst(ConstantValue::get(0.0f, "0.0"), alloca);
-					if(GlobalVal)
-						module->createGlobalValue(name,ptype,{},nullptr,false);
-				}
-			
 			}
-			values.push_back(alloca);
-			symTable.insert(name, Entry(alloca));
-			
 		}
 		
 	}
 	return values;
 }
 
-void SysYIRGenerator::visitInitVal2(SysYParser::InitValContext *ctx,InitList* values)
-{
-	auto *nowArray = arrayTable.query(ArrayName);
-	bool isInt = nowArray->isInt;
-	int length = nowArray->dims.size();
-	if(ctx->exp())
-	{
-		auto *exp = any_cast<Value *>(visitExp(ctx->exp()));
+// void SysYIRGenerator::visitInitVal2(SysYParser::InitValContext *ctx,InitList* values)
+// {
+// 	auto *nowArray = arrayTable.query(ArrayName);
+// 	bool isInt = nowArray->isInt;
+// 	int length = nowArray->dims.size();
+// 	if(ctx->exp())
+// 	{
+// 		auto *exp = any_cast<Value *>(visitExp(ctx->exp()));
 		
-		/*if(MyCount[ConstLayer]>nowArray->dims[ConstLayer])
-		{
-			cout<<"warning: excess elements in array initializer"<<endl;
-			return;
-		}*/
-		values->addOperand(exp);
-		//MyCount++;
-		for(int kk=0;kk<=Layer;kk++)
-			MyCount[kk]++;
-		//int eleNum = values->getNumOperands();
-		//return constexp;
-	}
-	else
-	{
-		//int MyCount = 0;
-		MyCount[Layer]=0;
-		//int nowElement=0;
-		int NumOfInit = ctx->initVal().size();
-		for(int kk=0;kk<NumOfInit;kk++)
-		{
-			auto constInit = ctx->initVal(kk);
-			if(constInit->LeftCurlyBracket())
-			{
-				Layer++;
-				MyCount[Layer]=0;
-				nowElement= MyCount[Layer-1];
-				visitInitVal2(constInit,values);
-				//CurlyBracket = true;
-			}
-			else
-			{
-				visitInitVal2(constInit,values);
-				if(kk+1<NumOfInit)
-					continue;
-			}
-			if(Layer>0 && nowElement%iCounts[length-Layer-1]==0){
-				int tmpm = MyCount[Layer];
-		//int goal = nowArray->dims[ConstLayer];
-				int goal = iCounts[length-Layer-1];
-				if(tmpm>goal)
-				{
-					cout<<"warning: excess elements in array initializer"<<endl;
-					return;
-				}
-				else if(tmpm<goal)
-				{
-					HalfInit = true;
-					for(int l=tmpm+1;l<=goal;l++)
-					{
-						if(isInt)
-						{
-							auto *constzero = (Value*)ConstantValue::get(0,"0");
-							values->addOperand(constzero);
-							for(int jj=0;jj<=Layer;jj++)
-								MyCount[jj]++;
-							//MyCount[ConstLayer]++;
-						}
-						else
-						{
-							auto *constzero = (Value*)ConstantValue::get(0.0f,"0.0");
-							values->addOperand(constzero);
-							for(int jj=0;jj<=Layer;jj++)
-								MyCount[jj]++;
-							//MyCount[ConstLayer]++;
+// 		/*if(MyCount[ConstLayer]>nowArray->dims[ConstLayer])
+// 		{
+// 			cout<<"warning: excess elements in array initializer"<<endl;
+// 			return;
+// 		}*/
+// 		values->addOperand(exp);
+// 		//MyCount++;
+// 		for(int kk=0;kk<=Layer;kk++)
+// 			MyCount[kk]++;
+// 		//int eleNum = values->getNumOperands();
+// 		//return constexp;
+// 	}
+// 	else
+// 	{
+// 		//int MyCount = 0;
+// 		MyCount[Layer]=0;
+// 		//int nowElement=0;
+// 		int NumOfInit = ctx->initVal().size();
+// 		for(int kk=0;kk<NumOfInit;kk++)
+// 		{
+// 			auto constInit = ctx->initVal(kk);
+// 			if(constInit->LeftCurlyBracket())
+// 			{
+// 				Layer++;
+// 				MyCount[Layer]=0;
+// 				nowElement= MyCount[Layer-1];
+// 				visitInitVal2(constInit,values);
+// 				//CurlyBracket = true;
+// 			}
+// 			else
+// 			{
+// 				visitInitVal2(constInit,values);
+// 				if(kk+1<NumOfInit)
+// 					continue;
+// 			}
+// 			if(Layer>0 && nowElement%iCounts[length-Layer-1]==0){
+// 				int tmpm = MyCount[Layer];
+// 		//int goal = nowArray->dims[ConstLayer];
+// 				int goal = iCounts[length-Layer-1];
+// 				if(tmpm>goal)
+// 				{
+// 					cout<<"warning: excess elements in array initializer"<<endl;
+// 					return;
+// 				}
+// 				else if(tmpm<goal)
+// 				{
+// 					HalfInit = true;
+// 					for(int l=tmpm+1;l<=goal;l++)
+// 					{
+// 						if(isInt)
+// 						{
+// 							auto *constzero = (Value*)ConstantValue::get(0,"0");
+// 							values->addOperand(constzero);
+// 							for(int jj=0;jj<=Layer;jj++)
+// 								MyCount[jj]++;
+// 							//MyCount[ConstLayer]++;
+// 						}
+// 						else
+// 						{
+// 							auto *constzero = (Value*)ConstantValue::get(0.0f,"0.0");
+// 							values->addOperand(constzero);
+// 							for(int jj=0;jj<=Layer;jj++)
+// 								MyCount[jj]++;
+// 							//MyCount[ConstLayer]++;
 			
-						}
-					}
+// 						}
+// 					}
 					
-				}
-			}
-			if(constInit->LeftCurlyBracket())
-			{
-				Layer--;
-				//MyCount[ConstLayer]=0;
-				//CurlyBracket = true;
-			}
-			if(values==nullptr)
-			{
-				// cout<<"initList==nullptr!"<<endl;
-				exit(-1);
-			}
-			//values->addOperand(value);
-			//count++;
-			// cout<<"I have addOperand"<<endl;
-		}
-		if(Layer==0)
-		{
-			int tmpm = MyCount[Layer];
-			//int goal = nowArray->dims[ConstLayer];
-			int goal = iCounts[length-Layer-1];
-			if(tmpm>goal)
-			{
-				cout<<"warning: excess elements in array initializer"<<endl;
-				return;
-			}
-			else if(tmpm<goal)
-			{
-				HalfInit = true;
-				for(int l=tmpm+1;l<=goal;l++)
-				{
-					if(isInt)
-					{
-						auto *constzero = (Value*)ConstantValue::get(0,"0");
-						values->addOperand(constzero);
-						MyCount[Layer]++;
-					}
-					else
-					{
-						auto *constzero = (Value*)ConstantValue::get(0.0f,"0.0");
-						values->addOperand(constzero);
-						MyCount[Layer]++;
+// 				}
+// 			}
+// 			if(constInit->LeftCurlyBracket())
+// 			{
+// 				Layer--;
+// 				//MyCount[ConstLayer]=0;
+// 				//CurlyBracket = true;
+// 			}
+// 			if(values==nullptr)
+// 			{
+// 				// cout<<"initList==nullptr!"<<endl;
+// 				exit(-1);
+// 			}
+// 			//values->addOperand(value);
+// 			//count++;
+// 			// cout<<"I have addOperand"<<endl;
+// 		}
+// 		if(Layer==0)
+// 		{
+// 			int tmpm = MyCount[Layer];
+// 			//int goal = nowArray->dims[ConstLayer];
+// 			int goal = iCounts[length-Layer-1];
+// 			if(tmpm>goal)
+// 			{
+// 				cout<<"warning: excess elements in array initializer"<<endl;
+// 				return;
+// 			}
+// 			else if(tmpm<goal)
+// 			{
+// 				HalfInit = true;
+// 				for(int l=tmpm+1;l<=goal;l++)
+// 				{
+// 					if(isInt)
+// 					{
+// 						auto *constzero = (Value*)ConstantValue::get(0,"0");
+// 						values->addOperand(constzero);
+// 						MyCount[Layer]++;
+// 					}
+// 					else
+// 					{
+// 						auto *constzero = (Value*)ConstantValue::get(0.0f,"0.0");
+// 						values->addOperand(constzero);
+// 						MyCount[Layer]++;
 			
-					}
-				}
-			}
+// 					}
+// 				}
+// 			}
 		
-		}
-	}
-}
+// 		}
+// 	}
+// }
 
 
 
@@ -896,117 +556,105 @@ any SysYIRGenerator::visitInitVal(SysYParser::InitValContext *ctx)
 	}
 	else
 	{
-		char Name[40];
-		sprintf(Name,"InitList%d",InitListName);
-		auto *initList = module->createInitList(Name);
-		InitListName++;
-		int count=0;
-		for(auto initv:ctx->initVal())
+		// char Name[40];
+		// sprintf(Name,"InitList%d",InitListName);
+		// auto *initList = module->createInitList(Name);
+		// InitListName++;
+		// int count=0;
+		vector<Value *> values;
+		for(auto *initVal : ctx->initVal())
 		{
-			Layer++;
-			auto *initval = any_cast<Value*>(visitInitVal(initv));
-			Layer--;
-			if(initval==nullptr)
-			{
-				// cout<<"initval is nullptr!!"<<endl;
-				exit(-1);
-			}
-			initList->addOperand(initval);
-			count++;
+			// Layer++;
+			auto *value = any_cast<Value*>(visitInitVal(initVal));
+			// Layer--;
+			// if(initval==nullptr)
+			// {
+			// 	// cout<<"initval is nullptr!!"<<endl;
+			// 	exit(-1);
+			// }
+			// initList->addOperand(initval);
+			// count++;
+			values.push_back(value);
 		}
-		auto *nowArray = arrayTable.query(ArrayName);
-		int num = nowArray->dims[Layer];
-		//bool isInt = nowArray->isInt;
-		int higher = (Layer+1>=nowArray->dims.size())?Layer+1:nowArray->dims.size()-1;
-		int higherNum = nowArray->dims[higher];
-		bool isInt = nowArray->isInt;
-		if(count>num)
-		{
-			int full = 0;
-			//int index = 0;
-			char Name[40];
-			sprintf(Name,"InitList%d",InitListName);
-			auto *merge = module->createInitList(Name);
-			InitListName+=1;
-			//int Enumber = getNumOperands
-			int count2=count;
-			for(int k=0;k<count2;k++)
-			{
-				auto item = dynamic_cast<InitList*>(initList->getOperand(k));
-				//int itemopnum = item->getNumOperands();
-				//cout<<"itemopnum: "<<itemopnum<<endl;
-				if(item!=nullptr && item->getNumOperands()==higherNum)
-				{
-					if(full>0 && full<higherNum)
-					{
-						for(int j=full+1;j<=higherNum;j++)
-						{
-							auto *gZero = any_cast<Value*>(GenerateZero(Layer+1,ArrayName));
-							merge->addOperand(gZero);		
-						}
-						initList->setOperand(k-1,(Value*)merge);
-						for(int j=0;j<higherNum-1;j++)
-						{
-							initList->removeOperand(k-2-j);
-						}
-						count2-=higherNum-1;
-						k-=higherNum-1;
-						full = 0;
-						char Name[40];
-						sprintf(Name,"InitList%d",InitListName);
-						merge = module->createInitList(Name);
-						InitListName+=1;
-						}
-					else
-						;
-				}
-				else
-				{
-					merge->addOperand(initList->getOperand(k));
-					full++;
-				}
-				if(full==higherNum)
-				{
-					initList->setOperand(k,(Value*)merge);
-					for(int j=0;j<full-1;j++)
-					{
-						initList->removeOperand(k-1-j);
-					}
-					count2-=full-1;
-					k-=higherNum-1;
-					full = 0;
-					char Name[40];
-					sprintf(Name,"InitList%d",InitListName);
-					merge = module->createInitList(Name);
-					InitListName+=1;
-					//continue;
-				}
-			}
-		}
-		for(int i=count+1;i<=num;i++)
-		{
-			// cout<<"GenerateConstZero"<<endl;
-			auto *gZero = any_cast<Value*>(GenerateZero(Layer+1,ArrayName));
+		auto *initValue = module->createInitList(values);
+		// auto *nowArray = arrayTable.query(ArrayName);
+		// int num = nowArray->dims[Layer];
+		// //bool isInt = nowArray->isInt;
+		// int higher = (Layer+1>=nowArray->dims.size())?Layer+1:nowArray->dims.size()-1;
+		// int higherNum = nowArray->dims[higher];
+		// bool isInt = nowArray->isInt;
+		// if(count>num)
+		// {
+		// 	int full = 0;
+		// 	//int index = 0;
+		// 	char Name[40];
+		// 	sprintf(Name,"InitList%d",InitListName);
+		// 	auto *merge = module->createInitList(Name);
+		// 	InitListName+=1;
+		// 	//int Enumber = getNumOperands
+		// 	int count2=count;
+		// 	for(int k=0;k<count2;k++)
+		// 	{
+		// 		auto item = dynamic_cast<InitList*>(initList->getOperand(k));
+		// 		//int itemopnum = item->getNumOperands();
+		// 		//cout<<"itemopnum: "<<itemopnum<<endl;
+		// 		if(item!=nullptr && item->getNumOperands()==higherNum)
+		// 		{
+		// 			if(full>0 && full<higherNum)
+		// 			{
+		// 				for(int j=full+1;j<=higherNum;j++)
+		// 				{
+		// 					auto *gZero = any_cast<Value*>(GenerateZero(Layer+1,ArrayName));
+		// 					merge->addOperand(gZero);		
+		// 				}
+		// 				initList->setOperand(k-1,(Value*)merge);
+		// 				for(int j=0;j<higherNum-1;j++)
+		// 				{
+		// 					initList->removeOperand(k-2-j);
+		// 				}
+		// 				count2-=higherNum-1;
+		// 				k-=higherNum-1;
+		// 				full = 0;
+		// 				char Name[40];
+		// 				sprintf(Name,"InitList%d",InitListName);
+		// 				merge = module->createInitList(Name);
+		// 				InitListName+=1;
+		// 				}
+		// 			else
+		// 				;
+		// 		}
+		// 		else
+		// 		{
+		// 			merge->addOperand(initList->getOperand(k));
+		// 			full++;
+		// 		}
+		// 		if(full==higherNum)
+		// 		{
+		// 			initList->setOperand(k,(Value*)merge);
+		// 			for(int j=0;j<full-1;j++)
+		// 			{
+		// 				initList->removeOperand(k-1-j);
+		// 			}
+		// 			count2-=full-1;
+		// 			k-=higherNum-1;
+		// 			full = 0;
+		// 			char Name[40];
+		// 			sprintf(Name,"InitList%d",InitListName);
+		// 			merge = module->createInitList(Name);
+		// 			InitListName+=1;
+		// 			//continue;
+		// 		}
+		// 	}
+		// }
+		// for(int i=count+1;i<=num;i++)
+		// {
+		// 	// cout<<"GenerateConstZero"<<endl;
+		// 	auto *gZero = any_cast<Value*>(GenerateZero(Layer+1,ArrayName));
 			
-			initList->addOperand(gZero);
-			/*int inner
-			for(int j=0;j<)
-			if(isInt)
-			{
-				int z = 0;
-				Value* zero = (Value*)ConstantValue::get(z);
-				initList->addOperand(zero);
-			}
-			else
-			{
-				float z = 0.0;
-				Value* zero = (Value*)ConstantValue::get(z);
-				initList->addOperand(zero);
-			}*/
-		}
-		return (Value *)initList;
+		// 	initList->addOperand(gZero);
+		// }
+		return (Value *)initValue;
 	}
-	return nullptr;
 }
 
 any SysYIRGenerator::visitFuncDef(SysYParser::FuncDefContext *ctx) {
@@ -1014,29 +662,36 @@ any SysYIRGenerator::visitFuncDef(SysYParser::FuncDefContext *ctx) {
 	Type *retType = any_cast<Type *>(visitFuncType(ctx->funcType()));
 	vector<Type *> paramTypes;
 	vector<string> paramNames;
+	vector<vector<Value *> > paramDims;
 	if(ctx->funcFParams())
 	{
 		for (auto *fparam : ctx->funcFParams()->funcFParam()) {
-			paramTypes.emplace_back(any_cast<Type *>(visitBType(fparam->bType())));
+			Type *type = any_cast<Type *>(visitBType(fparam->bType()));
+			vector<Value *> dims;
+			if (!fparam->LeftSquareBracket().empty()) { // array argument
+				dims.emplace_back(-1);
+				paramTypes.emplace_back(Type::getPointerType(type));
+				for (auto *exp : fparam->exp()) {
+					dims.emplace_back(any_cast<Value *>(visitExp(exp)));
+				}
+			} else {
+				paramTypes.emplace_back(type);
+			}
 			paramNames.emplace_back(fparam->Identifier()->getText());
+			paramDims.push_back(dims);
 		}
 	}
 	
 	Type *funcType = Type::getFunctionType(retType, paramTypes);
 	auto *function = module->createFunction(ctx->Identifier()->getText(), funcType);
 	auto *entry = function->getEntryBlock();
-	builder.setPosition(entry, entry->end());
-	symTable.newTable();
 	for (int i = 0; i < paramTypes.size(); ++i) {
-		auto *arg = entry->createArgument(paramTypes[i], paramNames[i]);
-		auto *ptr = builder.createAllocaInst(paramTypes[i], {}, newTemp());
-		builder.createStoreInst(arg, ptr);
-		symTable.insert(paramNames[i], Entry(ptr));
+		auto *arg = entry->createArgument(paramTypes[i], paramDims[i], paramNames[i]);
+		function->getSymTable()->insert(paramNames[i], arg, paramDims[i], nullptr, false);
 	}
 	// symTable.view();
+	builder.setPosition(entry, entry->end());
 	visitBlock(ctx->block());
-	symTable.destroyTop();
-	// cout << debug::change_color("function " + ctx->Identifier()->getText() + " created", debug::yellow) << endl;
 
 	return function;
 }
@@ -1067,7 +722,7 @@ any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx) {
 	Value *ret = nullptr;
 	if (ctx->lVal() != nullptr) {
 		auto lval = any_cast<pair<Value *, Value *>>(visitLVal(ctx->lVal()));
-		assert(lval.first != nullptr);				///< 赋值号左侧必须是变量
+		assert(lval.first != nullptr);				///< 赋值号左侧必须是地址
 		Value *exp = any_cast<Value *>(visitExp(ctx->exp()));
 		ret = builder.createStoreInst(exp, lval.first);
 	} else if (ctx->Return() != nullptr) {
@@ -1167,76 +822,61 @@ any SysYIRGenerator::visitCond(SysYParser::CondContext* ctx)
 
 any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx) {
 	auto name = ctx->Identifier()->getText();
-	vector<Value *> exps;
-	bool constflag = true;
-	// cout << "visitLVal: " << ctx->getText() << endl;
-
-	for (auto *exp : ctx->exp()) {
-		auto *e = any_cast<Value *>(visitExp(exp));
-		auto *pInteger = module->getInteger(e->getName());
-		if(pInteger!=nullptr)
-		{
-			/*char num[50]={0};
-			snprintf(num,sizeof(num),"%d",*pInteger);
-			name = name + "[" + num + "]";*/
-			exps.push_back(ConstantValue::get(*pInteger, e->getName()));
-		} else {
-			//name = name + "[" + e->name + "]";
-			constflag = false;
-			exps.push_back(e);
-		}   
-	}
-	// cout<<"LVal Name: "<<ctx->getText()<<endl;
-
+	auto *entry = builder.getSymTable()->query(ctx->Identifier()->getText());
+	auto dims = entry->getDims();
+	
 	if (!ctx->exp().empty()) {
 		// array
-		auto *entry = arrayTable.query(ctx->Identifier()->getText());
-		int tmpC = 1;
-		int ndim = entry->dims.size();
-		vector<int> Con;
-		for(int l=ndim-1;l>0;l--)
-		{
-			tmpC*=entry->dims[l];
-			Con.push_back(tmpC);
-			
-		}
-		
-		Value *pOffset = builder.createAllocaInst(Type::getPointerType(Type::getIntType()), {}, newTemp());
-		builder.createStoreInst(ConstantValue::get(0, "0"), pOffset);
-		Value *offset = builder.createLoadInst(pOffset, {}, newTemp());
+		vector<Value *> indices;
+		bool constflag = true;
 
-		if (ndim != 0) {
-			offset = builder.createPAddInst(offset, exps[0], newTemp());
-		}
-		for (int i = 1; i < ndim; ++i) {
-			stringstream ss;
-			ss << entry->dims[i];
-			offset = builder.createPMulInst(ConstantValue::get(entry->dims[i], ss.str()), offset, newTemp());
-			offset = builder.createPAddInst(offset, exps[i], newTemp());
-		}
-
-		Value *ptr = builder.createPAddInst(entry->base, offset, newTemp());
-		if (constflag && entry->isConst) {
-			vector<int> indices;
-			for (auto *index : exps) {
-				indices.push_back(dynamic_cast<ConstantValue *>(index)->getInt());
+		for (auto *exp : ctx->exp()) {
+			auto *index = any_cast<Value *>(visitExp(exp));
+			auto *constIndex = dynamic_cast<ConstantValue *>(index);
+			if(constIndex != nullptr) {
+				indices.push_back(constIndex);
+			} else {
+				constflag = false;
+				indices.push_back(index);
 			}
-			int oneIndex=0;
-			for(int l=0;l<ndim;l++)
-			{
-				oneIndex+=indices[l]*Con[ndim-l-2];
+		}
+		if (constflag) {
+			// const indices
+			int offset = 0;
+			assert(indices.size() == dims.size());
+			for(int i = 0; i < dims.size(); ++i) {
+				int index = dynamic_cast<ConstantValue *>(indices[i])->getInt();
+				int boundary = dynamic_cast<ConstantValue *>(dims[i])->getInt();
+				offset = offset * boundary + index;
 			}
-			auto *value = entry->value->getElement(oneIndex);
-			return make_pair((Value *)nullptr, value);
+			if (entry->isConstant()){
+				return make_pair((Value *)nullptr, entry->getInitValue()->getElement(dims, offset));
+			} else {
+				Value *pAddress = builder.createAllocaInst(entry->getValue()->getType(), {}, newTemp());
+				builder.createStoreInst(pAddress, ConstantValue::get(0, "0"));
+				Value *address = builder.createLoadInst(pAddress, {}, newTemp());
+				address = builder.createAddInst(address, ConstantValue::get(offset, to_string(offset)), newTemp());
+				return make_pair(pAddress, (Value *)nullptr);
+			}
 		} else {
-			return make_pair(ptr, (Value *)nullptr);
+			// varieble indices
+			Value *pAddress = builder.createAllocaInst(Type::getPointerType(Type::getIntType()), {}, newTemp());
+			builder.createStoreInst(ConstantValue::get(0, "0"), pAddress);
+			Value *address = builder.createLoadInst(pAddress, {}, newTemp());
+
+			for (int i = 0; i < dims.size(); ++i) {
+				auto *boundary = dynamic_cast<ConstantValue *>(dims[i]);
+				address = builder.createPMulInst(address, boundary, newTemp());
+				address = builder.createPAddInst(address, indices[i], newTemp());
+			}
+			return make_pair(address, (Value *)nullptr);
 		}
 	} else {
-		auto *entry = symTable.query(name);
-		if (entry->isConst) {
-			return make_pair((Value *)nullptr, entry->value);
+		// basic type varieble
+		if (entry->isConstant()) {
+			return make_pair((Value *)nullptr, entry->getValue());
 		} else {
-			return make_pair(entry->value, (Value *)nullptr);
+			return make_pair(entry->getValue(), (Value *)nullptr);
 		}
 	}
 }

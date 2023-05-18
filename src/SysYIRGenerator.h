@@ -19,11 +19,7 @@ private:
     std::vector<BasicBlock *> loopExit;
 
 public:
-    bool GlobalVal;
-    bool LocalVal;
-    bool HalfInit;
-    SymTable symTable;
-    ArrayTable arrayTable;
+    bool globalScope;
     std::vector<int> iDims;
     std::vector<int> iCounts;
     //int iCounts;

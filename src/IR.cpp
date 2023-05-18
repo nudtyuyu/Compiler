@@ -98,6 +98,12 @@ FunctionType *FunctionType::get(Type *returnType,
   return result.first->get();
 }
 
+Function::Function(Module *parent, Type *type, const std::string &name)
+      : Value(type, name), parent(parent), blocks() {
+    blocks.emplace_back(new BasicBlock(this, name + "_entry"));
+    symTable = new SymTable(parent->getSymTable());
+  }
+
 void Function::generateCode(std::ostream &out) const {
   for (const auto &block : blocks) {
     block->generateCode(out);
@@ -150,23 +156,14 @@ void User::removeOperand(int index)
 	operands.erase(operands.begin()+index);
 }
 
-Value * InitList::getElement(int index) {
+Value * InitList::getElement(const std::vector<Value *> &dims, int offset) {
   auto *pList = this;
-  /*for (auto index : indices) {
-    if (index >= pList->getNumOperands())
-      return nullptr;
-    auto *tmp = pList->getOperand(index);
-    if (tmp->getType() == Type::getInitListType()) {
-      pList = dynamic_cast<InitList *>(tmp);
-    } else {
-      return tmp;
-    }
-  }*/
-  if (index >= pList->getNumOperands())
-      return nullptr;
-  else
-  	return pList->getOperand(index);
-  
+  assert(dims.size() == indices.size());
+  for (int i = 0; i < dims.size(); ++i) {
+    int dim = dynamic_cast<ConstantValue *>(dims[i])->getInt();
+    assert(dim == -1 || index < dim);
+  }
+
 
   //return nullptr;
 }
@@ -348,6 +345,12 @@ void StoreInst::generateCode(std::ostream &out) const {
   }
   out << "\n";
 }
+
+BasicBlock::BasicBlock(Function *parent, const std::string &name)
+: Value(Type::getLabelType(), name), parent(parent), instructions(),
+  arguments(), successors(), predecessors() {
+    symTable = new SymTable(parent->getSymTable());
+  }
 
 void BasicBlock::generateCode(std::ostream &out) const {
   out << getName() << "(";
