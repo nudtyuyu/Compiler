@@ -1,9 +1,9 @@
 #include "codegen.hpp"
 #include <string>
-
+#include<iostream>
 namespace backend{
     using RegId = RegManager::RegId;
-
+    #define out std::cout
     string CodeGen::code_gen(){
         string code;
         code += module_gen(module);
@@ -163,6 +163,71 @@ namespace backend{
         /** 
          *code in here
         */
+        switch (bInst->getKind()) {
+            case Instruction::kAdd :
+            case Instruction::kFAdd :
+            code+=space+"add";
+            break;
+            case Instruction::kSub :
+            case Instruction::kFSub :
+            code+=space+"sub";
+            break;
+            case Instruction::kMul :
+            case Instruction::kFMul :
+            code+=space+"mul";
+            break;
+            case Instruction::kDiv :
+            case Instruction::kFDiv :
+            code+=space+"bl	__aeabi_idiv";/*需要在前面声明*/
+            break;
+            /*大概从这往下都是cmp加上跳转指令*/
+            case Instruction::kAnd :
+            // code+=space+"and";
+            // break;
+            case Instruction::kOr :
+            // code+=space+"or";
+            // break;
+            case Instruction::kICmpEQ :
+            case Instruction::kFCmpEQ :
+            // out << "==";
+            // break;
+            case Instruction::kICmpNE :
+            case Instruction::kFCmpNE :
+            // out << "!=";
+            // break;
+            case Instruction::kICmpLT :
+            case Instruction::kFCmpLT :
+            // out << "<";
+            // break;
+            case Instruction::kICmpGT :
+            case Instruction::kFCmpGT :
+            // out << ">";
+            // break;
+            case Instruction::kICmpLE :
+            case Instruction::kFCmpLE :
+            // out << "<=";
+            // break;
+            case Instruction::kICmpGE :
+            case Instruction::kFCmpGE :
+            // out << ">=";
+            code+=space+"cmp";
+            break;
+
+            /*取余回头再说*/
+            case Instruction::kRem :
+            case Instruction::kFRem : 
+            code+=space+"bl	__aeabi_idivmod";
+            break;
+            default:
+            out << "<error binary instruction type>";
+            exit(0);
+            break;
+        }
+        // sysy:Kind kind=bInst->getKind();
+        code += "    "+regm.toString(dstRegId);
+        code+=" "+bInst->getLhs()->getName()+" "+bInst->getRhs()->getName();
+        code+="\n";
+        // std::cout<<bInst<<"\n";
         return {dstRegId, code};
     }
 
