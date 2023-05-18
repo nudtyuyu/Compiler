@@ -10,6 +10,7 @@ class IRBuilder {
 private:
   BasicBlock *block;
   BasicBlock::iterator position;
+  SymTable *symTable;
 
 public:
   IRBuilder():block(new BasicBlock(nullptr)), position(block->end()) {} ///< 原始版本IRBuilder默认没有BasicBlock，遇到全局声明会出错
@@ -20,9 +21,11 @@ public:
 public:
   BasicBlock *getBasicBlock() const { return block; }
   BasicBlock::iterator getPosition() const { return position; }
+  SymTable *getSymTable() const {return symTable;}
   void setPosition(BasicBlock *block, BasicBlock::iterator position) {
     this->block = block;
     this->position = position;
+    this->symTable = block->symTable;
   }
   void setPosition(BasicBlock::iterator position) { this->position = position; }
 

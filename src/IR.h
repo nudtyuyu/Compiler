@@ -12,6 +12,8 @@
 #include <type_traits>
 #include <vector>
 
+#include "SymTable.h"
+
 namespace sysy {
 
 /*!
@@ -247,17 +249,19 @@ class BasicBlock;
 
 class Argument : public Value {
 protected:
+  std::vector<Value *> dims;
   BasicBlock *block;
   int index;
 
 public:
-  Argument(Type *type, BasicBlock *block, int index,
+  Argument(Type *type, const std::vector<Value *> &dims, BasicBlock *block, int index,
            const std::string &name = "")
-      : Value(type, name), block(block), index(index) {}
+      : Value(type, name), dims(dims), block(block), index(index) {}
 };
 
 class Instruction;
 class Function;
+class SymTable;
 /*!
  * The container for `Instruction` sequence.
  *
@@ -281,11 +285,10 @@ protected:
   arg_list arguments;
   block_list successors;
   block_list predecessors;
+  SymTable *symTable;
 
 protected:
-  explicit BasicBlock(Function *parent, const std::string &name = "")
-      : Value(Type::getLabelType(), name), parent(parent), instructions(),
-        arguments(), successors(), predecessors() {}
+  explicit BasicBlock(Function *parent, const std::string &name = "");
 
 public:
   int getNumInstructions() const { return instructions.size(); }
@@ -300,10 +303,13 @@ public:
   iterator begin() { return instructions.begin(); }
   iterator end() { return instructions.end(); }
   iterator terminator() { return std::prev(end()); }
-  Argument *createArgument(Type *type, const std::string &name = "") {
-    arguments.emplace_back(new Argument(type, this, arguments.size(), name));
+  Argument *createArgument(Type *type, const std::vector<Value *> &dims, const std::string &name = "") {
+    arguments.emplace_back(new Argument(type, dims, this, arguments.size(), name));
     return arguments.back();
   };
+  SymTable *getSymTable() const {
+    return symTable;
+  }
 
 public:
   void generateCode(std::ostream &out) const;
@@ -686,10 +692,7 @@ class Function : public Value {
   friend class Module;
 
 protected:
-  Function(Module *parent, Type *type, const std::string &name)
-      : Value(type, name), parent(parent), blocks() {
-    blocks.emplace_back(new BasicBlock(this, name));
-  }
+  Function(Module *parent, Type *type, const std::string &name);
 
 public:
   using block_list = std::list<std::unique_ptr<BasicBlock>>;
@@ -697,6 +700,7 @@ public:
 protected:
   Module *parent;
   block_list blocks;
+  SymTable *symTable;
 
 public:
   Type *getReturnType() const {
@@ -716,6 +720,9 @@ public:
       return block == b.get();
     });
   }
+  SymTable *getSymTable() const {
+    return symTable;
+  }
 
 public:
   void generateCode(std::ostream &out) const;
@@ -727,50 +734,25 @@ class GlobalValue : public User {
 
 protected:
   Module *parent;
-  bool hasInit;
-  bool isBss;
-  bool isConstant;
-  bool isHalf;
-  std::vector<int> Dim;
-  PointerType* ptype;
+  Value *initVal;
+  bool constant;
 
 protected:
-  GlobalValue(Module *parent, Type *type, const std::string &name,
-              const std::vector<Value *> &dims = {}, Value *init = nullptr,bool _isConstant=true,bool _isBss=true,bool _isHalf=false)
-      : User(type, name), parent(parent), hasInit(init),isBss(_isBss),isConstant(_isConstant),isHalf(_isHalf) {
-    assert(type->isPointer());
-    ptype = (PointerType*) type;
-    addOperands(dims);
-    if (init)
-      addOperand(init);
-    int length = dims.size();
-    int i=0;
-    for(i=0;i<length;i++)
-    {
-    	auto *value = dynamic_cast<ConstantValue *>(dims[i]);
-        assert(value != nullptr);
-        Dim.push_back(value->getInt());
-    }
-  }
+  GlobalValue(Module *_parent, Type *_type, const std::string &_name,
+              const std::vector<Value *> &dims = {}, Value *_initVal = nullptr, bool _constant=true)
+      : User(_type, _name), parent(_parent), initVal(_initVal), constant(_constant) {
+        addOperands(dims);
+      }
 
 public:
-  Value *init() const { //return hasInit ? operands.back().getValue() : nullptr; 
-  	if(hasInit)
-  	{
-  		return operands.back().getValue();
-  	}
-  	else
-  		return nullptr;
+  Value *getInitVal() const {
+  	return initVal;
   }
-  int getNumDims() const { //return getNumOperands() - (hasInit ? 1 : 0);
-  	return Dim.size(); 
+  int getNumDims() const {
+  	return getNumOperands(); 
   }
-  Value *getDim(int index) { return getOperand(index); }
-  int getDimValue(int index) {return Dim[index];}
-  bool IsConst() {return isConstant;}
-  Type *getType() {return ptype->getBaseType();}
-  bool IsBss() {return isBss;}
-  bool IsHalf() {return isHalf;}
+  Value * getDim(int index) { return getOperand(index); }
+  bool isConstant() {return constant;}
 }; // class GlobalValue
 
 // class InitList
@@ -781,13 +763,16 @@ protected:
   Module *parent;
 
 protected:
-  InitList(Module *module, const std::string &name = ""):
-    User(Type::getInitListType(), name), parent(module) {}
+  InitList(Module *module, const std::vector<Value *> &values = {}, const std::string &name = ""):
+    User(Type::getInitListType(), name), parent(module) {
+        addOperands(values);
+    }
 
 public:
-  Value *getElement(int index);
+  Value *getElement(const std::vector<Value *> &dims, int offset);
 }; // class InitList
 
+class SymTable;
 //! IR unit for representing a SysY compile unit
 class Module {
 protected:
@@ -796,9 +781,12 @@ protected:
   std::map<std::string, int> integers;
   std::map<std::string, float> floats;
   std::map<std::string, std::unique_ptr<InitList>> initLists;
+  SymTable *symTable;
 
 public:
-  Module() = default;
+  Module():functions(), globals(), integers(), floats(), initLists() {
+    symTable = new SymTable(nullptr);
+  }
 
 public:
   int* createInteger(const std::string &name, int value) {
@@ -820,15 +808,14 @@ public:
     return result.first->second;
   };
   GlobalValue *createGlobalValue(const std::string &name, Type *type,
-                                 const std::vector<Value *> &dims = {},Value* initVal=nullptr,bool isConstant=true,bool isBss=true,bool isHalf=false) {
-    auto result =
-        globals.try_emplace(name, new GlobalValue(this, type, name, dims,initVal,isConstant,isBss,isHalf));
+                                 const std::vector<Value *> &dims = {}, Value* initVal = nullptr, bool constant=true) {
+    auto result = globals.try_emplace(name, new GlobalValue(this, type, name, dims, initVal, constant));
     if (not result.second)
       return nullptr;
     return result.first->second;
   }
-  InitList *createInitList(const std::string &name) {
-    auto result = initLists.try_emplace(name, new InitList(this, name));
+  InitList *createInitList(const std::vector<Value *> &values, const std::string &name = "") {
+    auto result = initLists.try_emplace(name, new InitList(this, values, name));
     if (not result.second)
       return nullptr;
     return result.first->second.get();
@@ -869,6 +856,9 @@ public:
   }
   std::map<std::string, GlobalValue *> *getGlobalValues(){
     return &globals;
+  }
+  SymTable *getSymTable() const {
+    return symTable;
   }
 }; // class Module
 
