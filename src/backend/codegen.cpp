@@ -233,11 +233,37 @@ namespace backend{
 
     pair<RegId, string> CodeGen::unaryInst_gen(UnaryInst *uInst, RegId dstRegId){
         string code;
-        /** 
-         *code in here
-        */
+        // *********************************************
+        switch (uInst->getKind()) {
+            case Instruction::kPos :
+            case Instruction::kFPos :
+            code += space + "mov" + "    "+regm.toString(dstRegId) + " " + uInst->getOperand()->getName() + "\n";
+            break;
+
+            // TODO 使用mvn的话,操作数为参数数值减1(编译器使用mvn?)
+            // TODO 暂时使用sub
+            case Instruction::kNeg :
+            case Instruction::kFNeg :
+            code += space + "sub" + "    "+regm.toString(dstRegId) + " " + "#0" + " " + uInst->getOperand()->getName() + "\n";
+            break;
+
+            case Instruction::kNot :
+            code += space + "mvn" + "    "+regm.toString(dstRegId) + " " + uInst->getOperand()->getName() + "\n";
+            break;
+
+            // TODO
+            case Instruction::kFtoI :
+            case Instruction::kIToF :
+
+            default:
+            out << "<error uinary instruction type>";
+            exit(0);
+            break;
+        }
+        // *********************************************
         return {dstRegId, code};
     }
+
     pair<RegId, string> 
     CodeGen::allocaInst_gen(AllocaInst *aInst, RegManager::RegId dstRegId){
         string code;
