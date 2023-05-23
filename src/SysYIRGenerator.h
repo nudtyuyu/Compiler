@@ -4,6 +4,7 @@
 #include <ostream>
 #include <sstream>
 #include <string>
+#include <vector>
 #include "IR.h"
 #include "IRBuilder.h"
 #include "SysYBaseVisitor.h"
@@ -20,25 +21,27 @@ private:
 
 public:
     bool globalScope;
-    std::vector<int> iDims;
-    std::vector<int> iCounts;
+    // std::vector<int> iDims;
+    // std::vector<int> iCounts;
     //int iCounts;
-    std::vector<int> MyCount;
-    int ConstInitListName;
+    // std::vector<int> MyCount;
+    // int ConstInitListName;
     int InitListName;
     int nowElement;
-    int Layer;// visit initvalue layer for var Array
-    int ConstLayer; //visit initvalue layer for const Array
-    std::string ArrayName;
-    std::string ConstArrayName;
-    int Rows;
-    int Cols;
+    // int layer;// visit initvalue layer for var Array
+    // int constLayer; //visit initvalue layer for const Array
+    // std::string ArrayName;
+    // std::string ConstArrayName;
+    // int Rows;
+    // int Cols;
 
 public:
     SysYIRGenerator() = default;
+
 public:
-    void AssignArray(std::vector<std::vector<Value*> >Values,std::vector<int>Dims,int dim);
+    // void AssignArray(std::vector<std::vector<Value*> >Values,std::vector<int>Dims,int dim);
     std::any getInitValues(std::vector<std::vector<Value*> >Values,std::vector<int>Dims,int dim,int flag);
+
     Value *getElementPtr(AllocaInst *base, std::vector<Value *> indices);
 
 public:
@@ -56,13 +59,19 @@ public:
 
     // virtual std::any visitConstDef(SysYParser::ConstDefContext *context) override;
 
-    virtual std::any visitConstInitVal(SysYParser::ConstInitValContext *context) override;
+    // deprecated
+    // virtual std::any visitConstInitVal(SysYParser::ConstInitValContext *context) override;
+
+    std::any visitConstInitVal(SysYParser::ConstInitValContext *context, const std::vector<int> &dims, int layer);
 
     virtual std::any visitVarDecl(SysYParser::VarDeclContext *context) override;
 
     // virtual std::any visitVarDef(SysYParser::VarDefContext *context) override;
 
-    virtual std::any visitInitVal(SysYParser::InitValContext *context) override;
+    // deprecated
+    // virtual std::any visitInitVal(SysYParser::InitValContext *context) override;
+
+    std::any visitInitVal(SysYParser::InitValContext *context, const std::vector<int> &dims, int layer);
 
     virtual std::any visitFuncDef(SysYParser::FuncDefContext *context) override;
 
@@ -82,22 +91,8 @@ public:
 
     virtual std::any visitCond(SysYParser::CondContext *context) override;
 
-    /**
-     * @brief 
-     * @param context 
-     * @return  std::any -> std::pair<Value *ptr, Value *val>
-     * @return  若为常量, ptr为nullptr, val为ConstantValue*;
-     * @return  若为变量, ptr为指针值, val为nullptr.(不返回变量值是因为涉及到数组元素修改导致值作废的问题)
-     */
     virtual std::any visitLVal(SysYParser::LValContext *context) override;
 
-    /**
-     * @brief 
-     * @param context 
-     * @return std::any -> sysy::Value *
-     * @return 若为变量值，返回基类指针Value *
-     * @return 若为常量值，返回子类指针ConstantValue *
-     */
     virtual std::any visitPrimaryExp(SysYParser::PrimaryExpContext *context) override;
 
     virtual std::any visitNumber(SysYParser::NumberContext *context) override;
@@ -127,10 +122,10 @@ public:
         module->generateCode(out);
     }
     
-    void visitConstInitVal2(SysYParser::ConstInitValContext *ctx,InitList* values);
-    void visitInitVal2(SysYParser::InitValContext *ctx,InitList* values);
+    // void visitConstInitVal2(SysYParser::ConstInitValContext *ctx,InitList* values);
+    // void visitInitVal2(SysYParser::InitValContext *ctx,InitList* values);
     
-    std::any GenerateZero(int Lay, std::string name);
+    // std::any GenerateZero(int Lay, std::string name);
 
     std::string newTemp() {
         static std::stringstream ss;

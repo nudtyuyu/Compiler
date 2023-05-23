@@ -7,6 +7,7 @@ SymTable::Entry *SymTable::insert(const std::string &name, Value *value, const s
     if (entries.find(name) != entries.end()) {
         return nullptr;
     } else {
+
         entries[name] = entry;
         return entry;
     }

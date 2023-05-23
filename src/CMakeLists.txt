@@ -17,7 +17,6 @@ add_executable(sysyc
   IR.cpp
   SysYIRGenerator.cpp
   Diagnostic.cpp
-  backend/codegen.cpp
   SymTable.cpp
 )
 target_include_directories(sysyc PRIVATE ${CMAKE_CURRENT_BINARY_DIR})

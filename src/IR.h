@@ -261,7 +261,6 @@ public:
 
 class Instruction;
 class Function;
-class SymTable;
 /*!
  * The container for `Instruction` sequence.
  *
@@ -335,7 +334,7 @@ public:
   };
 
 public:
-  int getNumOperands() const { return operands.size(); }
+  size_t getNumOperands() const { return operands.size(); }
   auto operand_begin() const { return operands.begin(); }
   auto operand_end() const { return operands.end(); }
   auto getOperands() const {
@@ -619,7 +618,7 @@ class AllocaInst : public Instruction {
 protected:
   AllocaInst(Type *type, const std::vector<Value *> &dims = {},
              BasicBlock *parent = nullptr, const std::string &name = "")
-      : Instruction(kAlloca, Type::getPointerType(type), parent, name) { ///< bug fixed: alloca指令应当返回指针（既是定义要求，也是其它指令的需要）
+      : Instruction(kAlloca, Type::getPointerType(type), parent, name) {
     addOperands(dims);
   }
 
@@ -761,18 +760,25 @@ class InitList : public User {
 
 protected:
   Module *parent;
+  std::vector<int> indices;
 
 protected:
-  InitList(Module *module, const std::vector<Value *> &values = {}, const std::string &name = ""):
-    User(Type::getInitListType(), name), parent(module) {
+  InitList(Module *module, const std::vector<Value *> &values = {}, const std::vector<int> &initIndices = {}, const std::string &name = ""):
+    User(Type::getInitListType(), name), parent(module), indices(initIndices) {
         addOperands(values);
     }
 
 public:
-  Value *getElement(const std::vector<Value *> &dims, int offset);
+  Value *getElement(int index);
+
+public:
+  void generateCode(std::ostream &out) const {
+    for (size_t i = 0; i < indices.size(); ++i)
+      out << indices[i] << " ";
+    out << "\n";
+  }
 }; // class InitList
 
-class SymTable;
 //! IR unit for representing a SysY compile unit
 class Module {
 protected:
@@ -814,8 +820,8 @@ public:
       return nullptr;
     return result.first->second;
   }
-  InitList *createInitList(const std::vector<Value *> &values, const std::string &name = "") {
-    auto result = initLists.try_emplace(name, new InitList(this, values, name));
+  InitList *createInitList(const std::vector<Value *> &values, const std::vector<int> &indices, const std::string &name = "") {
+    auto result = initLists.try_emplace(name, new InitList(this, values, indices, name));
     if (not result.second)
       return nullptr;
     return result.first->second.get();

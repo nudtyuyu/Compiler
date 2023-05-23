@@ -1,4 +1,5 @@
 #include <any>
+#include <cstddef>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -14,14 +15,14 @@ using namespace std;
 namespace sysy {
 
 Value *SysYIRGenerator::getElementPtr(AllocaInst *base, std::vector<Value *> indices) {
-	int ndim = base->getNumDims();
+	size_t ndim = base->getNumDims();
 	assert(ndim == indicies.size());
 	Value *pOffset = builder.createAllocaInst(Type::getPointerType(Type::getIntType()), {}, newTemp());	///< pointer type
 	builder.createStoreInst(ConstantValue::get(0, "0"), pOffset);
 	Value *offset = builder.createLoadInst(pOffset, {}, newTemp());	///< int type
 
 	offset = builder.createPAddInst(offset, indices[0], newTemp());
-	for (int i = 1; i < ndim; ++i) {
+	for (size_t i = 1; i < ndim; ++i) {
 		offset = builder.createPMulInst(base->getDim(i), offset, newTemp());
 		offset = builder.createAddInst(offset, indices[i], newTemp());
 	}
@@ -33,10 +34,12 @@ Value *SysYIRGenerator::getElementPtr(AllocaInst *base, std::vector<Value *> ind
 
 any SysYIRGenerator::visitCompUnit(SysYParser::CompUnitContext *ctx)
 {
-	auto Unit = new Module;
-	assert(Unit);
-	module.reset(Unit);
-	ConstInitListName = 0;
+	// cerr << "visit compunit" << endl;
+	auto *unit = new Module;
+	assert(unit);
+	module.reset(unit);
+	builder.setModule(unit);
+	// ConstInitListName = 0;
 	InitListName = 0;
 
 	for(auto decl:ctx->decl())
@@ -55,6 +58,7 @@ any SysYIRGenerator::visitCompUnit(SysYParser::CompUnitContext *ctx)
 
 any SysYIRGenerator::visitDecl(SysYParser::DeclContext *ctx)
 {
+	// cerr << "visit decl" << endl;
 	auto decl = (ctx->constDecl())?visitConstDecl(ctx->constDecl()):visitVarDecl(ctx->varDecl());
 	return (decl);
 }
@@ -66,21 +70,25 @@ any SysYIRGenerator::visitBType(SysYParser::BTypeContext *ctx)
 
 any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 {
+	// cerr << "visit const decl" << endl;
 	vector <Value*> values;
 	auto *type = any_cast<Type*>(visitBType(ctx->bType()));
 	for(auto *constdef:ctx->constDef())
 	{
 		auto name = constdef->Identifier()->getText();
 		vector <Value *> dims;
+		vector <int> iDims;
 		if(!constdef->constExp().empty())
 		{	// array
 			for(auto *constexp:constdef->constExp())
 			{
-				auto *dim = any_cast<ConstantValue*>(visitConstExp(constexp));
+				auto *dim = any_cast<Value*>(visitConstExp(constexp));
 				assert(dim->isInt());
 				dims.push_back(dim);
+				iDims.push_back(dynamic_cast<ConstantValue *>(dim)->getInt());
 			}
-			auto *initValue = std::any_cast<Value *>(visitConstInitVal(constdef->constInitVal()));
+			nowElement = 0;
+			auto *initValue = std::any_cast<Value *>(visitConstInitVal(constdef->constInitVal(), iDims, 0));
 			if(globalScope) {
 				auto *globalValue = module->createGlobalValue(name, type, dims, initValue, true);
 				builder.getSymTable()->insert(name, globalValue, dims, initValue, true);
@@ -92,7 +100,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 		}
 		else
 		{
-			auto *initValue = any_cast<Value *>(visitConstInitVal(constdef->constInitVal()));
+			auto *initValue = any_cast<Value *>(visitConstInitVal(constdef->constInitVal(), iDims, 0));
 			
 			builder.getSymTable()->insert(name, initValue, {}, initValue, true);
 			if(globalScope) {
@@ -288,25 +296,58 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 // 	}
 // }
 
-any SysYIRGenerator::visitConstInitVal(SysYParser::ConstInitValContext *ctx)
+any SysYIRGenerator::visitConstInitVal(SysYParser::ConstInitValContext *ctx, const std::vector<int> &dims, int layer)
 {
-	// cout<<"visitConstInitVal"<<endl;
+	// cerr<<"visit const init val"<<endl;
 	if(ctx->constExp())
 	{
+		// scalar initialized by expression
 		auto *constexp = any_cast<Value *>(visitConstExp(ctx->constExp()));
+		nowElement++;
 		return constexp;
+	}
+	else if (dims.empty())
+	{
+		// scalar initialized by list
+		nowElement++;
+		if (!ctx->constInitVal().empty()) {
+			return any_cast<Value *>(visitConstInitVal(ctx->constInitVal().at(0), dims, layer + 1));
+		} else {
+			return (Value *)ConstantValue::get(0, "0");
+		}
 	}
 	else
 	{
+		// array initialized by list
 		std::vector<Value *> values;
+		std::vector<int> indices;
+		int startElement = nowElement;
+		int nextElement = 1;
+		for (size_t i = layer; i < dims.size(); ++i) {
+			nextElement *= dims[i];
+		}
+		nextElement += startElement;
+
 		for(auto *constInitVal:ctx->constInitVal())
 		{
-			auto *value = any_cast<Value *>(visitConstInitVal(constInitVal));
+			if(nowElement >= nextElement) {
+				cerr <<"warning: excess elements in array initializer"<<endl;
+				break;
+			}
+
+			int curLayer = dims.size(), blockSize = 1;
+			while (curLayer > layer + 1 && nowElement % (blockSize * dims[curLayer - 1]) == 0) {
+				blockSize *= dims[curLayer - 1];
+				curLayer--;
+			}
+			indices.push_back(nowElement);
+			auto *value = any_cast<Value *>(visitConstInitVal(constInitVal, dims, curLayer));
 			values.push_back(value);
 		}
-		auto *initValue = module->createInitList(values);
+		auto *initValue = module->createInitList(values, indices, "initlist" + to_string(InitListName++));
+		nowElement = nextElement;
 		// auto *nowArray = arrayTable.query(ConstArrayName);
-		// int num = nowArray->dims[ConstLayer];
+		// int num = dims[layer];
 		// int higher = (ConstLayer+1>=nowArray->dims.size())?ConstLayer+1:nowArray->dims.size()-1;
 		// int higherNum = nowArray->dims[higher];
 		// bool isInt = nowArray->isInt;
@@ -338,22 +379,26 @@ any SysYIRGenerator::visitConstInitVal(SysYParser::ConstInitValContext *ctx)
 
 any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 {
+	// cerr << "visit var decl: " << ctx->getText() << endl;
 	vector <Value*> values;
 	auto *type = any_cast<Type *>(visitBType(ctx->bType()));
 	for(auto *vardef:ctx->varDef())
 	{
 		auto name = vardef->Identifier()->getText();
 		vector <Value *> dims;
+		vector <int> iDims;
 		if(!vardef->constExp().empty())
 		{	// array
 			for(auto constexp:vardef->constExp())
 			{
-				auto dim = any_cast<Value*>(visitConstExp(constexp));
+				auto *dim = any_cast<Value*>(visitConstExp(constexp));
 				dims.push_back(dim);
+				iDims.push_back(dynamic_cast<ConstantValue *>(dim)->getInt());
 			}
 			if(vardef->Assign())
 			{
-				auto *initValue = any_cast<Value *>(visitInitVal(vardef->initVal()));
+				nowElement = 0;
+				auto *initValue = any_cast<Value *>(visitInitVal(vardef->initVal(), iDims, 0));
 				if(globalScope)
 				{
 					auto *globalValue = module->createGlobalValue(name, type, dims, initValue, false);
@@ -379,7 +424,7 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 		{
 			if(vardef->Assign())
 			{
-				auto *initValue = any_cast<Value *>(visitInitVal(vardef->initVal()));
+				auto *initValue = any_cast<Value *>(visitInitVal(vardef->initVal(), iDims, 0));
 				if(globalScope) {
 					auto *globalValue = module->createGlobalValue(name, type, {}, initValue, false);
 					builder.getSymTable()->insert(name, globalValue, {}, nullptr, false);
@@ -546,37 +591,63 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 
 
 
-any SysYIRGenerator::visitInitVal(SysYParser::InitValContext *ctx)
+any SysYIRGenerator::visitInitVal(SysYParser::InitValContext *ctx, const std::vector<int> &dims, int layer)
 {
-	// cout<<"visitInitVal"<<endl;
+	// cerr << "visit init val: " << ctx->getText() << endl;
+	// cerr << "    at layer " << layer << endl;
+	// cerr << "    nowElement = " << nowElement << endl;
 	if(ctx->exp())
 	{
+		// scalar initialized by expression
 		auto exp = any_cast<Value *>(visitExp(ctx->exp()));
+		nowElement++;
 		return exp;
+	}
+	else if (dims.empty())
+	{
+		// scalar initialized by list
+		nowElement++;
+		if (!ctx->initVal().empty()) {
+			return any_cast<Value *>(visitInitVal(ctx->initVal().at(0), dims, layer + 1));
+		} else {
+			return (Value *)ConstantValue::get(0, "0");
+		}
 	}
 	else
 	{
+		// array initialized by list
 		// char Name[40];
 		// sprintf(Name,"InitList%d",InitListName);
 		// auto *initList = module->createInitList(Name);
 		// InitListName++;
 		// int count=0;
 		vector<Value *> values;
+		std::vector<int> indices;
+		int startElement = nowElement;
+		int nextElement = 1;
+		for (size_t i = layer; i < dims.size(); ++i) {
+			nextElement *= dims[i];
+		}
+		nextElement += startElement;
+		// cerr << "    nextElement = " << nextElement << endl;
+
 		for(auto *initVal : ctx->initVal())
 		{
-			// Layer++;
-			auto *value = any_cast<Value*>(visitInitVal(initVal));
-			// Layer--;
-			// if(initval==nullptr)
-			// {
-			// 	// cout<<"initval is nullptr!!"<<endl;
-			// 	exit(-1);
-			// }
-			// initList->addOperand(initval);
-			// count++;
+			if(nowElement >= nextElement) {
+				cerr << "warning: excess elements in array initializer" << endl;
+				break;
+			}
+			int curLayer = dims.size(), blockSize = 1;
+			while (curLayer > layer + 1 && nowElement % (blockSize * dims[curLayer - 1]) == 0) {
+				blockSize *= dims[curLayer - 1];
+				curLayer--;
+			}
+			indices.push_back(nowElement);
+			auto *value = any_cast<Value*>(visitInitVal(initVal, dims, curLayer));
 			values.push_back(value);
 		}
-		auto *initValue = module->createInitList(values);
+		auto *initValue = module->createInitList(values, indices, "initlist" + to_string(InitListName++));
+		nowElement = nextElement;
 		// auto *nowArray = arrayTable.query(ArrayName);
 		// int num = nowArray->dims[Layer];
 		// //bool isInt = nowArray->isInt;
@@ -669,7 +740,7 @@ any SysYIRGenerator::visitFuncDef(SysYParser::FuncDefContext *ctx) {
 			Type *type = any_cast<Type *>(visitBType(fparam->bType()));
 			vector<Value *> dims;
 			if (!fparam->LeftSquareBracket().empty()) { // array argument
-				dims.emplace_back(-1);
+				dims.emplace_back(ConstantValue::get(0, "0"));
 				paramTypes.emplace_back(Type::getPointerType(type));
 				for (auto *exp : fparam->exp()) {
 					dims.emplace_back(any_cast<Value *>(visitExp(exp)));
@@ -685,7 +756,7 @@ any SysYIRGenerator::visitFuncDef(SysYParser::FuncDefContext *ctx) {
 	Type *funcType = Type::getFunctionType(retType, paramTypes);
 	auto *function = module->createFunction(ctx->Identifier()->getText(), funcType);
 	auto *entry = function->getEntryBlock();
-	for (int i = 0; i < paramTypes.size(); ++i) {
+	for (size_t i = 0; i < paramTypes.size(); ++i) {
 		auto *arg = entry->createArgument(paramTypes[i], paramDims[i], paramNames[i]);
 		function->getSymTable()->insert(paramNames[i], arg, paramDims[i], nullptr, false);
 	}
@@ -844,13 +915,14 @@ any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx) {
 			// const indices
 			int offset = 0;
 			assert(indices.size() == dims.size());
-			for(int i = 0; i < dims.size(); ++i) {
+			for(size_t i = 0; i < dims.size(); ++i) {
 				int index = dynamic_cast<ConstantValue *>(indices[i])->getInt();
 				int boundary = dynamic_cast<ConstantValue *>(dims[i])->getInt();
 				offset = offset * boundary + index;
 			}
 			if (entry->isConstant()){
-				return make_pair((Value *)nullptr, entry->getInitValue()->getElement(dims, offset));
+				InitList *initList = dynamic_cast<InitList *>(entry->getInitValue());
+				return make_pair((Value *)nullptr, initList->getElement(offset));
 			} else {
 				Value *pAddress = builder.createAllocaInst(entry->getValue()->getType(), {}, newTemp());
 				builder.createStoreInst(pAddress, ConstantValue::get(0, "0"));
@@ -864,7 +936,7 @@ any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx) {
 			builder.createStoreInst(ConstantValue::get(0, "0"), pAddress);
 			Value *address = builder.createLoadInst(pAddress, {}, newTemp());
 
-			for (int i = 0; i < dims.size(); ++i) {
+			for (size_t i = 0; i < dims.size(); ++i) {
 				auto *boundary = dynamic_cast<ConstantValue *>(dims[i]);
 				address = builder.createPMulInst(address, boundary, newTemp());
 				address = builder.createPAddInst(address, indices[i], newTemp());
@@ -1657,7 +1729,7 @@ any SysYIRGenerator::visitRelExp(SysYParser::RelExpContext* ctx)
 
 any SysYIRGenerator::visitConstExp(SysYParser::ConstExpContext *ctx)
 {
-	// cout<<"visitConstExp"<<endl;
+	// cerr<<"visit const exp"<<endl;
 	return visitAddExp(ctx->addExp());
 }
 

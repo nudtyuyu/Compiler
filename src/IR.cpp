@@ -84,7 +84,7 @@ FunctionType *FunctionType::get(Type *returnType,
   auto iter =
       std::find_if(functionTypes.begin(), functionTypes.end(),
                    [&](const std::unique_ptr<FunctionType> &type) -> bool {
-                     if (returnType != type->getReturnType() or
+                     if (returnType != type->getReturnType() ||
                          paramTypes.size() != type->getParamTypes().size())
                        return false;
                      return std::equal(paramTypes.begin(), paramTypes.end(),
@@ -156,16 +156,23 @@ void User::removeOperand(int index)
 	operands.erase(operands.begin()+index);
 }
 
-Value * InitList::getElement(const std::vector<Value *> &dims, int offset) {
-  auto *pList = this;
-  assert(dims.size() == indices.size());
-  for (int i = 0; i < dims.size(); ++i) {
-    int dim = dynamic_cast<ConstantValue *>(dims[i])->getInt();
-    assert(dim == -1 || index < dim);
+Value *InitList::getElement(int index) {
+  for (size_t i = 0; i < indices.size(); ++i) {
+    if (indices[i] > index) {
+      Value *value = getOperand(i - 1);
+      InitList *initList = dynamic_cast<InitList *>(value);
+      if (initList != nullptr) {
+        return initList->getElement(index);
+      } else {
+        if (indices[i - 1] == index) {
+          return value;
+        } else {
+          return ConstantValue::get(0, "0");
+        }
+      }
+    }
   }
-
-
-  //return nullptr;
+  return nullptr;
 }
 
 CallInst::CallInst(Function *callee, const std::vector<Value *> args,
@@ -365,6 +372,10 @@ void BasicBlock::generateCode(std::ostream &out) const {
 }
 
 void Module::generateCode(std::ostream &out) const {
+  for (auto &initList:initLists) {
+    out << initList.first << ": ";
+    initList.second->generateCode(out);
+  }
   for (auto &func : functions) {
     func.second->generateCode(out);
   }

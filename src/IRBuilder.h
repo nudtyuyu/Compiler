@@ -2,6 +2,7 @@
 
 #include "IR.h"
 #include <cassert>
+#include <cstddef>
 #include <memory>
 
 namespace sysy {
@@ -13,7 +14,7 @@ private:
   SymTable *symTable;
 
 public:
-  IRBuilder():block(new BasicBlock(nullptr)), position(block->end()) {} ///< 原始版本IRBuilder默认没有BasicBlock，遇到全局声明会出错
+  IRBuilder() = default;
   IRBuilder(BasicBlock *block) : block(block), position(block->end()) {}
   IRBuilder(BasicBlock *block, BasicBlock::iterator position)
       : block(block), position(position) {}
@@ -21,7 +22,8 @@ public:
 public:
   BasicBlock *getBasicBlock() const { return block; }
   BasicBlock::iterator getPosition() const { return position; }
-  SymTable *getSymTable() const {return symTable;}
+  SymTable *getSymTable() const { return symTable; }
+  void setModule(Module *module) { symTable = module->getSymTable(); }
   void setPosition(BasicBlock *block, BasicBlock::iterator position) {
     this->block = block;
     this->position = position;
