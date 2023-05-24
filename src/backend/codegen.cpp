@@ -454,6 +454,7 @@ namespace backend{
         {
         	string name = iter->first;
         	GlobalValue* gb = iter->second;
+        	//auto sym = builder.getSymTable()->query(name);
         	auto NumDims = gb->getNumDims();
         	auto type = gb->getType();
         	int size = 4;
@@ -462,9 +463,8 @@ namespace backend{
         	int ElementNum = 1;
         	for(i=0;i<NumDims;i++)
         	{
-        		auto d = gb->getDimValue(i);
-        		
-        		ElementNum*=d;
+        		auto d = dynamic_cast<ConstantValue *>(gb->getDim(i));
+        		ElementNum*=d->getInt();
         	}
         	allSpace= ElementNum*size;
         	/*if(i==0)
@@ -474,17 +474,13 @@ namespace backend{
         	char ObjSpace[50];
         	sprintf(ObjSpace,"%d",allSpace);
         	asmCode += space + ".global  " + name + endl;
-        	if(gb->IsConst())
+        	if(gb->isConstant())
         	{
         		asmCode += space + ".section " + space+".rodata" + endl;
         	}
-        	else if(gb->IsBss())
+        	else if(gb->getInitVal()==nullptr)
         	{
         		asmCode += space + ".bss" + endl;
-        	}
-        	else if(gb->IsHalf())
-        	{
-        		;
         	}
         	else
         	{
@@ -494,10 +490,12 @@ namespace backend{
         	asmCode+= space + ".type    " + name + ","+ " %object"+endl;
         	asmCode+= space + ".size    " + name + ", " + ObjSpace + endl;
         	asmCode+= name + ":" +endl;
-        	auto initV = gb->init();
-        	if(initV!=nullptr && !initV->isInitList())
+        	auto initV = gb->getInitVal();
+        	//auto numDims = gb->getNumDims();
+        	if(NumDims==0 && initV!=nullptr)
         	{
-        		auto initv = (ConstantValue*)initV;
+        		// not array (has init)
+        		auto initv = dynamic_cast<ConstantValue *>(initV);
         		if(type->isInt())
         		{
         			int number = initv->getInt();
@@ -526,13 +524,13 @@ namespace backend{
         			
         		}
         	}
-        	else if(initV==nullptr && gb->IsBss())
+        	else if(initV==nullptr)
         	{
         		asmCode+= space + ".space   " + ObjSpace +endl;
         	}	
         	else
         	{
-        		auto initv = (InitList*)initV;
+        		auto initv = dynamic_cast<InitList *>(initV);
         		int numZero;
         		for(int j=0;j<ElementNum;j++)
         		{

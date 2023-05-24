@@ -8,9 +8,9 @@ using namespace std;
 using namespace antlr4;
 // #include "SysYFormatter.h"
 #include "SysYIRGenerator.h"
-// #include "backend/codegen.hpp"
+#include "backend/codegen.hpp"
 using namespace sysy;
-// using backend::CodeGen;
+using backend::CodeGen;
 
 int main(int argc, char **argv) {
   if (argc > 3) {
@@ -47,9 +47,9 @@ int main(int argc, char **argv) {
     return EXIT_SUCCESS;
   }
 
-  // CodeGen codegen(moduleIR);
-  // string asmCode = codegen.code_gen();
-  // cout << asmCode << endl;;
+  CodeGen codegen(moduleIR);
+  string asmCode = codegen.code_gen();
+  cout << asmCode << endl;;
   
   return EXIT_SUCCESS;
 }

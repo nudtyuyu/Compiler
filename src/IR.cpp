@@ -157,19 +157,44 @@ void User::removeOperand(int index)
 }
 
 Value *InitList::getElement(int index) {
-  for (size_t i = 0; i < indices.size(); ++i) {
-    if (indices[i] > index) {
+  if(index>indices[indices.size()-1]) //not very right,need to edit
+  {
+  	 return ConstantValue::get(0, "0");
+  }
+  for (size_t i = 0; i < indices.size(); ++i) 
+  {
+    if (indices[i] > index) 
+    {
       Value *value = getOperand(i - 1);
       InitList *initList = dynamic_cast<InitList *>(value);
-      if (initList != nullptr) {
+      if (initList != nullptr) 
+      {
         return initList->getElement(index);
-      } else {
-        if (indices[i - 1] == index) {
-          return value;
-        } else {
-          return ConstantValue::get(0, "0");
-        }
+      } 
+      else 
+      {
+        	if (indices[i - 1] == index) 
+        	{
+          		return value;
+        	} 
+        	else 
+        	{
+          		return ConstantValue::get(0, "0");
+        	}
       }
+    }
+    else if(indices[i]==index)
+    {
+    	Value *value = getOperand(i);
+    	InitList *initList = dynamic_cast<InitList *>(value);
+    	if(initList != nullptr)
+    	{
+    		return initList->getElement(index);
+    	}
+    	else
+    	{
+    		return value;
+    	}
     }
   }
   return nullptr;
