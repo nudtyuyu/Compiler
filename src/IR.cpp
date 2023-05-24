@@ -85,7 +85,7 @@ FunctionType *FunctionType::get(Type *returnType,
       std::find_if(functionTypes.begin(), functionTypes.end(),
                    [&](const std::unique_ptr<FunctionType> &type) -> bool {
                      if (returnType != type->getReturnType() ||
-                         paramTypes.size() != type->getParamTypes().size())
+                         paramTypes.size() != (unsigned long)type->getParamTypes().size())
                        return false;
                      return std::equal(paramTypes.begin(), paramTypes.end(),
                                        type->getParamTypes().begin());
@@ -157,14 +157,11 @@ void User::removeOperand(int index)
 }
 
 Value *InitList::getElement(int index) {
-  if(index>indices[indices.size()-1]) //not very right,need to edit
-  {
-  	 return ConstantValue::get(0, "0");
-  }
   for (size_t i = 0; i < indices.size(); ++i) 
   {
     if (indices[i] > index) 
     {
+      assert(i != 0);
       Value *value = getOperand(i - 1);
       InitList *initList = dynamic_cast<InitList *>(value);
       if (initList != nullptr) 
@@ -183,21 +180,31 @@ Value *InitList::getElement(int index) {
         	}
       }
     }
-    else if(indices[i]==index)
-    {
-    	Value *value = getOperand(i);
-    	InitList *initList = dynamic_cast<InitList *>(value);
-    	if(initList != nullptr)
-    	{
-    		return initList->getElement(index);
-    	}
-    	else
-    	{
-    		return value;
-    	}
+    // else if(indices[i]==index)
+    // {
+    // 	Value *value = getOperand(i);
+    // 	InitList *initList = dynamic_cast<InitList *>(value);
+    // 	if(initList != nullptr)
+    // 	{
+    // 		return initList->getElement(index);
+    // 	}
+    // 	else
+    // 	{
+    // 		return value;
+    // 	}
+    // }
+  }
+  Value *value = getOperand(indices.size() - 1);
+  InitList *initList = dynamic_cast<InitList *>(value);
+  if (initList != nullptr) {
+    return initList->getElement(index);
+  } else {
+    if (indices[indices.size() - 1] == index) {
+      return value;
+    } else {
+      return ConstantValue::get(0, "0");
     }
   }
-  return nullptr;
 }
 
 CallInst::CallInst(Function *callee, const std::vector<Value *> args,

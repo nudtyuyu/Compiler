@@ -87,7 +87,7 @@ namespace backend{
         // arguments & return value (4 bytes)
         auto arguments = func->getEntryBlock()->getArguments();
         code += space + "sub    sp, sp, #" + to_string(std::min(4ul, arguments.size()) * 4) + "\n";
-        for (int i = 0; i < arguments.size(); ++i) {
+        for (size_t i = 0; i < arguments.size(); ++i) {
             if (i < 4) {
                 paramsStOffset[arguments[i]] = spOffset;
                 spOffset -= 4;
