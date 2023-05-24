@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
     generator.generateCode(std::cout);
     return EXIT_SUCCESS;
   }
-
+  cerr << "IR generated" << endl;
   CodeGen codegen(moduleIR);
   string asmCode = codegen.code_gen();
   cout << asmCode << endl;;

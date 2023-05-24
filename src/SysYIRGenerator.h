@@ -42,7 +42,7 @@ public:
     // void AssignArray(std::vector<std::vector<Value*> >Values,std::vector<int>Dims,int dim);
     std::any getInitValues(std::vector<std::vector<Value*> >Values,std::vector<int>Dims,int dim,int flag);
 
-    Value *getElementPtr(AllocaInst *base, std::vector<Value *> indices);
+    Value *getElementPtr(Value *base, const std::vector<Value *> &dims, const std::vector<Value *> &indices);
 
 public:
   Module *get() const { return module.get(); }

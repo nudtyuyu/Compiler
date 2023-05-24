@@ -14,23 +14,23 @@ using namespace std;
 
 namespace sysy {
 
-Value *SysYIRGenerator::getElementPtr(AllocaInst *base, std::vector<Value *> indices) {
-	size_t ndim = base->getNumDims();
-	assert(ndim == indicies.size());
-	Value *pOffset = builder.createAllocaInst(Type::getPointerType(Type::getIntType()), {}, newTemp());	///< pointer type
-	builder.createStoreInst(ConstantValue::get(0, "0"), pOffset);
-	Value *offset = builder.createLoadInst(pOffset, {}, newTemp());	///< int type
+// Value *SysYIRGenerator::getElementPtr(Value *base, const std::vector<Value *> &dims, const std::vector<Value *> &indices) {
+// 	size_t ndim = base->getNumDims();
+// 	assert(ndim == indicies.size());
+// 	Value *pOffset = builder.createAllocaInst(base->getType(), {}, newTemp());
+// 	builder.createStoreInst(ConstantValue::get(0, "0"), pOffset);
+// 	Value *offset = base;	///< int type
 
-	offset = builder.createPAddInst(offset, indices[0], newTemp());
-	for (size_t i = 1; i < ndim; ++i) {
-		offset = builder.createPMulInst(base->getDim(i), offset, newTemp());
-		offset = builder.createAddInst(offset, indices[i], newTemp());
-	}
+// 	offset = builder.createPAddInst(offset, indices[0], newTemp());
+// 	for (size_t i = 1; i < ndim; ++i) {
+// 		offset = builder.createPMulInst(base->getDim(i), offset, newTemp());
+// 		offset = builder.createAddInst(offset, indices[i], newTemp());
+// 	}
 
-	Value *ptr = builder.createPAddInst(base, offset, newTemp());
+// 	Value *ptr = builder.createPAddInst(base, offset, newTemp());
 
-	return ptr;
-}
+// 	return ptr;
+// }
 
 any SysYIRGenerator::visitCompUnit(SysYParser::CompUnitContext *ctx)
 {
@@ -90,7 +90,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 			nowElement = 0;
 			auto *initValue = std::any_cast<Value *>(visitConstInitVal(constdef->constInitVal(), iDims, 0));
 			if(globalScope) {
-				auto *globalValue = module->createGlobalValue(name, type, dims, initValue, true);
+				auto *globalValue = module->createGlobalValue(name, Type::getPointerType(type), dims, initValue, true);
 				builder.getSymTable()->insert(name, globalValue, dims, initValue, true);
 			}
 			else {
@@ -401,7 +401,7 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 				auto *initValue = any_cast<Value *>(visitInitVal(vardef->initVal(), iDims, 0));
 				if(globalScope)
 				{
-					auto *globalValue = module->createGlobalValue(name, type, dims, initValue, false);
+					auto *globalValue = module->createGlobalValue(name, Type::getPointerType(type), dims, initValue, false);
 					builder.getSymTable()->insert(name, globalValue, dims, initValue, false);
 				} else {
 					auto *allocaInst = builder.createAllocaInst(type, dims, name);
@@ -412,7 +412,7 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 			else
 			{
 				if(globalScope) {
-					auto *globalValue = module->createGlobalValue(name, type, dims, nullptr, false);
+					auto *globalValue = module->createGlobalValue(name, Type::getPointerType(type), dims, nullptr, false);
 					builder.getSymTable()->insert(name, globalValue, dims, {}, false);
 				} else {	
 					auto *allocaInst = builder.createAllocaInst(type, dims, name);
@@ -426,7 +426,7 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 			{
 				auto *initValue = any_cast<Value *>(visitInitVal(vardef->initVal(), iDims, 0));
 				if(globalScope) {
-					auto *globalValue = module->createGlobalValue(name, type, {}, initValue, false);
+					auto *globalValue = module->createGlobalValue(name, Type::getPointerType(type), {}, initValue, false);
 					builder.getSymTable()->insert(name, globalValue, {}, nullptr, false);
 				} else {
 					auto *allocaInst = builder.createAllocaInst(type, {}, name);
@@ -440,13 +440,13 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 					if(type->isInt())
 					{
 						auto *initValue = ConstantValue::get(0, "0");
-						auto *globalValue = module->createGlobalValue(name, type, {}, nullptr, false);
+						auto *globalValue = module->createGlobalValue(name, Type::getPointerType(type), {}, nullptr, false);
 						builder.getSymTable()->insert(name, globalValue, {}, nullptr, false);
 					}
 					else if(type->isFloat())
 					{
 						auto *initValue = ConstantValue::get(0.0f, "0.0");
-						auto *globalValue = module->createGlobalValue(name, type, {}, nullptr, false);
+						auto *globalValue = module->createGlobalValue(name, Type::getPointerType(type), {}, nullptr, false);
 						builder.getSymTable()->insert(name, globalValue, {}, nullptr, false);
 					}
 				} else {
@@ -729,7 +729,7 @@ any SysYIRGenerator::visitInitVal(SysYParser::InitValContext *ctx, const std::ve
 }
 
 any SysYIRGenerator::visitFuncDef(SysYParser::FuncDefContext *ctx) {
-	// cout << debug::change_color("creating function " + ctx->Identifier()->getText(), debug::yellow) << endl;
+	// cerr << "visit func def " + ctx->Identifier()->getText() << endl;
 	Type *retType = any_cast<Type *>(visitFuncType(ctx->funcType()));
 	vector<Type *> paramTypes;
 	vector<string> paramNames;
@@ -756,12 +756,12 @@ any SysYIRGenerator::visitFuncDef(SysYParser::FuncDefContext *ctx) {
 	Type *funcType = Type::getFunctionType(retType, paramTypes);
 	auto *function = module->createFunction(ctx->Identifier()->getText(), funcType);
 	auto *entry = function->getEntryBlock();
+	builder.setPosition(entry, entry->end());
 	for (size_t i = 0; i < paramTypes.size(); ++i) {
-		auto *arg = entry->createArgument(paramTypes[i], paramDims[i], paramNames[i]);
-		function->getSymTable()->insert(paramNames[i], arg, paramDims[i], nullptr, false);
+		auto *argument = entry->createArgument(paramTypes[i], paramDims[i], paramNames[i]);
+		function->getSymTable()->insert(paramNames[i], argument, paramDims[i], nullptr, false);
 	}
 	// symTable.view();
-	builder.setPosition(entry, entry->end());
 	visitBlock(ctx->block());
 
 	return function;
@@ -790,6 +790,7 @@ any SysYIRGenerator::visitBlockItem(SysYParser::BlockItemContext *ctx) {
 }
 
 any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx) {
+	// cerr << "visit stmt:" << ctx->getText() << endl;
 	Value *ret = nullptr;
 	if (ctx->lVal() != nullptr) {
 		auto lval = any_cast<pair<Value *, Value *>>(visitLVal(ctx->lVal()));
@@ -802,68 +803,71 @@ any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx) {
 			value = any_cast<Value *>(visitExp(ctx->exp()));
 		ret = builder.createReturnInst(value);
 	} else if (ctx->If() != nullptr) {
-		auto *block = builder.getBasicBlock();   						///< 当前所在基本块
-		auto *func = block->getParent();         						///< 当前所在函数
-		auto *thenBlock = func->addBasicBlock(newBlockName()); 			///< then分支基本块
-		auto *elseBlock = func->addBasicBlock(newBlockName());   		///< else分支基本块（可能没有，但构造指令时不能为nullptr）
-		auto *exitBlock = func->addBasicBlock(newBlockName()); 			///< if-then-else结束后的部分
+		auto *curBlock = builder.getBasicBlock();   						///< 当前所在基本块
+		auto *func = curBlock->getParent();         						///< 当前所在函数
+		auto *thenBlock = func->addBasicBlock(builder.getSymTable(), newBlockName() + "if_then"); 	///< then分支基本块
+		auto *elseBlock = func->addBasicBlock(builder.getSymTable(), newBlockName() + "if_else");   ///< else分支基本块（可能没有，但构造指令时不能为nullptr）
+		auto *exitBlock = func->addBasicBlock(builder.getSymTable(), newBlockName()); 				///< if-then-else结束后的部分
 		auto *cond = any_cast<Value *>(visitCond(ctx->cond()));
 
 		ret = builder.createCondBrInst(cond, thenBlock, elseBlock, {}, {});
 
 		// translate thenblock
-		block->getSuccessors().push_back(thenBlock);
-		thenBlock->getPredecessors().push_back(block);
+		curBlock->getSuccessors().push_back(thenBlock);
+		thenBlock->getPredecessors().push_back(curBlock);
 		builder.setPosition(thenBlock, thenBlock->end());
 		visitStmt(ctx->stmt()[0]);
 		builder.createUncondBrInst(exitBlock, {});
-		builder.setPosition(block, block->end());
+		auto *exitThenBlock = builder.getBasicBlock();
 
 		// translate elseblock
-		block->getSuccessors().push_back(elseBlock);
-		elseBlock->getPredecessors().push_back(block);
+		curBlock->getSuccessors().push_back(elseBlock);
+		elseBlock->getPredecessors().push_back(curBlock);
 		builder.setPosition(elseBlock, elseBlock->end());
 		if (ctx->Else() != nullptr) {
 			visitStmt(ctx->stmt()[1]);
 		}
 		builder.createUncondBrInst(exitBlock, {});
-		builder.setPosition(block, block->end());
+		auto *exitElseBlock = builder.getBasicBlock();
 
 		// prepare to translate exitblock
-		block->getSuccessors().push_back(exitBlock);
-		exitBlock->getPredecessors().push_back(block);
+		exitThenBlock->getSuccessors().push_back(exitBlock);
+		exitBlock->getPredecessors().push_back(exitThenBlock);
+		exitElseBlock->getSuccessors().push_back(exitBlock);
+		exitBlock->getPredecessors().push_back(exitElseBlock);
 		builder.setPosition(exitBlock, exitBlock->end());
 	} else if (ctx->While() != nullptr) {
-		auto *block = builder.getBasicBlock();    ///< 当前所在基本块
-		auto *func = block->getParent();          ///< 当前所在函数
-		auto *entryBlock = func->addBasicBlock(newBlockName()); ///< 循环入口，即循环条件计算和判断
-		auto *innerBlock = func->addBasicBlock(newBlockName()); ///< while循环体块
-		auto *exitBlock = func->addBasicBlock(newBlockName());  ///< while循环结束后的部分
-
-		block->getSuccessors().push_back(entryBlock);
-		entryBlock->getPredecessors().push_back(block);
-		entryBlock->getSuccessors().push_back(innerBlock);
-		innerBlock->getPredecessors().push_back(entryBlock);
-		entryBlock->getSuccessors().push_back(exitBlock);
-		exitBlock->getPredecessors().push_back(entryBlock);
-		innerBlock->getSuccessors().push_back(entryBlock);
-		entryBlock->getPredecessors().push_back(innerBlock);
+		auto *curBlock = builder.getBasicBlock();		///< 当前所在基本块
+		auto *func = curBlock->getParent();				///< 当前所在函数
+		auto *entryBlock = func->addBasicBlock(builder.getSymTable(), newBlockName() + "while_cond"); 	///< 循环入口，即循环条件计算和判断
+		auto *bodyBlock = func->addBasicBlock(builder.getSymTable(), newBlockName() + "while_body"); 	///< while循环体块
+		auto *exitBlock = func->addBasicBlock(builder.getSymTable(), newBlockName());  					///< while循环结束后的部分
 
 		// translate cond/entry block
+		curBlock->getSuccessors().push_back(entryBlock);
+		entryBlock->getPredecessors().push_back(curBlock);
 		builder.setPosition(entryBlock, entryBlock->end());
 		auto *cond = any_cast<Value *>(visitCond(ctx->cond()));
-		ret = builder.createCondBrInst(cond, innerBlock, exitBlock, {}, {});
+		ret = builder.createCondBrInst(cond, bodyBlock, exitBlock, {}, {});
+		auto *exitEntryBlock = builder.getBasicBlock();
 
 		// translate inner block
-		builder.setPosition(innerBlock, innerBlock->end());
+		exitEntryBlock->getSuccessors().push_back(bodyBlock);
+		bodyBlock->getPredecessors().push_back(exitEntryBlock);
+		builder.setPosition(bodyBlock, bodyBlock->end());
 		loopEntry.push_back(entryBlock);
 		loopExit.push_back(exitBlock);
 		visitStmt(ctx->stmt()[0]);
 		builder.createUncondBrInst(entryBlock, {});
 		loopExit.pop_back();
 		loopEntry.pop_back();
+		auto *exitbodyBlock = builder.getBasicBlock();
 
 		// prepare to translate exitblock
+		exitEntryBlock->getSuccessors().push_back(exitBlock);
+		exitBlock->getPredecessors().push_back(exitEntryBlock);
+		exitbodyBlock->getSuccessors().push_back(exitBlock);
+		exitBlock->getPredecessors().push_back(exitbodyBlock);
 		builder.setPosition(exitBlock, exitBlock->end());
 	} else if (ctx->Break()) {
 		std::vector<Value *> args; ///< 留空
@@ -872,7 +876,21 @@ any SysYIRGenerator::visitStmt(SysYParser::StmtContext *ctx) {
 		std::vector<Value *> args; ///< 留空
 		ret = builder.createUncondBrInst(loopEntry.back(), args);
 	} else if (ctx->block()) {
+		auto *predBlock = builder.getBasicBlock();
+		auto *newBlock = predBlock->getParent()->addBasicBlock(new SymTable(predBlock->getSymTable()), newBlockName());
+		auto *succBlock = predBlock->getParent()->addBasicBlock(predBlock->getSymTable(), newBlockName());
+
+		// translate block
+		predBlock->getSuccessors().push_back(newBlock);
+		newBlock->getPredecessors().push_back(predBlock);
+		builder.setPosition(newBlock, newBlock->end());
 		ret = any_cast<Value *>(visitBlock(ctx->block()));
+		auto *exitNewBlock = builder.getBasicBlock();
+
+		// translate succBlock
+		exitNewBlock->getSuccessors().push_back(succBlock);
+		succBlock->getPredecessors().push_back(exitNewBlock);
+		builder.setPosition(succBlock, succBlock->end());
 	} else if (ctx->exp()) {
 		ret = any_cast<Value *>(visitExp(ctx->exp()));
 	}
@@ -892,6 +910,7 @@ any SysYIRGenerator::visitCond(SysYParser::CondContext* ctx)
 }
 
 any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx) {
+	// cerr << "visit lval: " << ctx->getText() << endl;
 	auto name = ctx->Identifier()->getText();
 	auto *entry = builder.getSymTable()->query(ctx->Identifier()->getText());
 	auto dims = entry->getDims();
@@ -924,17 +943,12 @@ any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx) {
 				InitList *initList = dynamic_cast<InitList *>(entry->getInitValue());
 				return make_pair((Value *)nullptr, initList->getElement(offset));
 			} else {
-				Value *pAddress = builder.createAllocaInst(entry->getValue()->getType(), {}, newTemp());
-				builder.createStoreInst(pAddress, ConstantValue::get(0, "0"));
-				Value *address = builder.createLoadInst(pAddress, {}, newTemp());
-				address = builder.createAddInst(address, ConstantValue::get(offset, to_string(offset)), newTemp());
-				return make_pair(pAddress, (Value *)nullptr);
+				Value *address = builder.createPAddInst(entry->getValue(), ConstantValue::get(offset, to_string(offset)), newTemp());
+				return make_pair(address, (Value *)nullptr);
 			}
 		} else {
 			// varieble indices
-			Value *pAddress = builder.createAllocaInst(Type::getPointerType(Type::getIntType()), {}, newTemp());
-			builder.createStoreInst(ConstantValue::get(0, "0"), pAddress);
-			Value *address = builder.createLoadInst(pAddress, {}, newTemp());
+			Value *address = entry->getValue();
 
 			for (size_t i = 0; i < dims.size(); ++i) {
 				auto *boundary = dynamic_cast<ConstantValue *>(dims[i]);

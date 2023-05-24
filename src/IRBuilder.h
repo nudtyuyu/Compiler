@@ -230,6 +230,7 @@ public:
   LoadInst *createLoadInst(Value *pointer,
                            const std::vector<Value *> &indices = {},
                            const std::string &name = "") {
+    std::cerr << "int * ? " << (pointer->getType() == Type::getPointerType(Type::getIntType())) << std::endl;
     auto inst = new LoadInst(pointer, indices, block, name);
     assert(inst);
     block->getInstructions().emplace(position, inst);

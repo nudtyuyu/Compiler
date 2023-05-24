@@ -16,8 +16,8 @@ SymTable::Entry *SymTable::insert(const std::string &name, Value *value, const s
 SymTable::Entry *SymTable::query(const std::string &name) {
     SymTable *pTable = this;
     while (pTable != nullptr) {
-        if (entries.find(name) != entries.end())
-            return entries[name];
+        if (pTable->entries.find(name) != pTable->entries.end())
+            return pTable->entries[name];
         pTable = pTable->parent;
     }
     return nullptr;

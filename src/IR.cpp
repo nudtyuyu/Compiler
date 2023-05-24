@@ -100,8 +100,8 @@ FunctionType *FunctionType::get(Type *returnType,
 
 Function::Function(Module *parent, Type *type, const std::string &name)
       : Value(type, name), parent(parent), blocks() {
-    blocks.emplace_back(new BasicBlock(this, name + "_entry"));
     symTable = new SymTable(parent->getSymTable());
+    blocks.emplace_back(new BasicBlock(this, symTable, name + "_entry"));
   }
 
 void Function::generateCode(std::ostream &out) const {
@@ -385,10 +385,11 @@ void StoreInst::generateCode(std::ostream &out) const {
   out << "\n";
 }
 
-BasicBlock::BasicBlock(Function *parent, const std::string &name)
+BasicBlock::BasicBlock(Function *parent, SymTable *symTable, const std::string &name)
 : Value(Type::getLabelType(), name), parent(parent), instructions(),
   arguments(), successors(), predecessors() {
-    symTable = new SymTable(parent->getSymTable());
+    assert(symTable != nullptr);
+    this->symTable = symTable;
   }
 
 void BasicBlock::generateCode(std::ostream &out) const {

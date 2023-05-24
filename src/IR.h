@@ -287,7 +287,7 @@ protected:
   SymTable *symTable;
 
 protected:
-  explicit BasicBlock(Function *parent, const std::string &name = "");
+  explicit BasicBlock(Function *parent, SymTable *symTable, const std::string &name = "");
 
 public:
   int getNumInstructions() const { return instructions.size(); }
@@ -303,7 +303,7 @@ public:
   iterator end() { return instructions.end(); }
   iterator terminator() { return std::prev(end()); }
   Argument *createArgument(Type *type, const std::vector<Value *> &dims, const std::string &name = "") {
-    arguments.emplace_back(new Argument(type, dims, this, arguments.size(), name));
+    arguments.emplace_back(new Argument(Type::getPointerType(type), dims, this, arguments.size(), name));
     return arguments.back();
   };
   SymTable *getSymTable() const {
@@ -710,8 +710,8 @@ public:
   }
   auto getBasicBlocks() { return make_range(blocks); }
   BasicBlock *getEntryBlock() { return blocks.front().get(); }
-  BasicBlock *addBasicBlock(const std::string &name = "") {
-    blocks.emplace_back(new BasicBlock(this, name));
+  BasicBlock *addBasicBlock(SymTable *symTable, const std::string &name = "") {
+    blocks.emplace_back(new BasicBlock(this, symTable, name));
     return blocks.back().get();
   }
   void removeBasicBlock(BasicBlock *block) {
