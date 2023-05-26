@@ -25,7 +25,8 @@
 #include <iostream>
 #include <algorithm>
 #include <vector>
-
+#include <stdlib.h>
+#include <time.h>
 #include <IR.h>
 
 using namespace sysy;
@@ -83,7 +84,7 @@ namespace backend {
                         srcReg0 + ", " + srcReg1 + endl;
     }
     //
-    class RegManager{     
+    class RegManager{  
     public:
         //{0,1,2,3,4,5,6,7,8,9,10};
         enum RegId : unsigned {
@@ -98,6 +99,11 @@ namespace backend {
             R8 = 8,
             R9 = 9,
             R10 = 10,
+            R11 = 11,
+            R12 = 12,
+            SP  = 13,
+            LR  = 14,
+            PC  = 15,
             RNONE = 1024,
             RANY = 2048,
         };
@@ -106,6 +112,55 @@ namespace backend {
             if(reg == RANY) return "RANY";
             return "r" + to_string(reg);
         }
+    private:
+    	std::map<RegId,std::vector<std::string> > RVALUE;
+    public:
+    	RegManager()
+    	{
+    		for(int i=0;i<16;i++)
+    		{
+    			std::vector<std::string> rval;
+    			RVALUE[RegId(i)]=rval;
+    		}
+    	}
+    
+    public:
+    	RegId AssignReg()
+    	{
+    		// Really Really Easy!
+    		for(int i=4;i<=12;i++)
+    		{
+    			if(i==11 || i==9)
+    			{
+    				continue;
+    			}
+    			else if(RVALUE[RegId(i)].size()==0)
+    			{
+    				return RegId(i);
+    			}
+    		}
+    		srand((unsigned)time(NULL));
+    		int label = 4+rand()%13;
+    		while(label==11 || label==9)
+    		{
+    			label = 4+rand()%13;
+    		}
+    		return RegId(label);
+    	}
+    	std::vector<std::string> getRVALUE(RegId reg)
+    	{
+    		return RVALUE[reg];
+    	}
+    	bool IsEmpty(RegId reg)
+    	{
+    		if(RVALUE[reg].size()==0)
+    		{
+    			return true;
+    		}
+    		else
+    			return false;
+    	}
+    	
     };
 
     class Operand{
@@ -155,6 +210,7 @@ namespace backend {
         //label manager
         map<BasicBlock *, string> bb_labels;
         uint64_t label_no = 0;
+        size_t fpOffset = 0;
 
         
 

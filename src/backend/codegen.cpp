@@ -19,7 +19,7 @@ namespace backend{
         //generate asmcode for all global values 
         dataCode += globaldata_gen();
 
-        code += space + ".arch armv7ve " + endl;
+        code += space + ".arch armv7 " + endl;
         code += space + ".text " + endl;
         auto functions = module->getFunctions();
         //auto functions = module->functions;
@@ -124,6 +124,7 @@ namespace backend{
     }
 
     string CodeGen::function_gen(Function *func){
+    	fpOffset = 0;
         curFunc = func;
         clearFunctionRecord(func);
         string bbCode;
@@ -270,6 +271,20 @@ namespace backend{
         /** 
          *code in here
         */
+        dstRegId = regm.AssignReg();
+        if(!regm.IsEmpty(dstRegId))
+        {
+        	auto Rvalue = regm.getRVALUE(dstRegId);
+        	for(int j=0;j<Rvalue.size();j++)
+        	{
+        		auto var = Rvalue[j];
+        		//TODO find the addr in AVALUE(var)
+        		code += space + "str    " + regm.toString(dstRegId) + ", " + var + endl;
+        	}
+        }
+        // TODO get The Value or do nothing
+        code += space + "movs    " + regm.toString(dstRegId) + ", "+ "#MyValue"+endl;
+        fpOffset-=4;
         return {dstRegId, code};
     }
 
