@@ -614,11 +614,11 @@ public:
 //! Allocate memory for stack variables, used for non-global variable declartion
 class AllocaInst : public Instruction {
   friend class IRBuilder;
-
+  
 protected:
   AllocaInst(Type *type, const std::vector<Value *> &dims = {},
              BasicBlock *parent = nullptr, const std::string &name = "")
-      : Instruction(kAlloca, Type::getPointerType(type), parent, name) {
+      : Instruction(kAlloca, Type::getPointerType(type), parent, name){
     addOperands(dims);
   }
 
@@ -626,6 +626,7 @@ public:
   int getNumDims() const { return getNumOperands(); }
   auto getDims() const { return getOperands(); }
   Value *getDim(int index) { return getOperand(index); }
+  //auto getName(){return Name;}
 
 public:
   void generateCode(std::ostream &out) const override;
@@ -866,6 +867,11 @@ public:
   SymTable *getSymTable() const {
     return symTable;
   }
+  void setSymTable(SymTable*table)
+  {
+  	symTable = table;
+  }
+  
 }; // class Module
 
 /*!

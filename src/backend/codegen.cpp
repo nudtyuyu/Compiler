@@ -74,6 +74,7 @@ namespace backend{
    string CodeGen::prologueCode_gen(Function *func){
         string code;
         int spOffset = 0;
+        fpOffset = -8;
         
         // preserve callee-saved registers (R4-R8, R10, fp, lr)
         code += space + "push   {fp, lr}\n";
@@ -124,7 +125,7 @@ namespace backend{
     }
 
     string CodeGen::function_gen(Function *func){
-    	fpOffset = 0;
+    	//fpOffset = -8;
         curFunc = func;
         clearFunctionRecord(func);
         string bbCode;
@@ -279,12 +280,61 @@ namespace backend{
         	{
         		auto var = Rvalue[j];
         		//TODO find the addr in AVALUE(var)
-        		code += space + "str    " + regm.toString(dstRegId) + ", " + var + endl;
+        		auto varp = module->getSymTable()->query(var);
+        		auto offset = varp->getOffset();
+        		code += space + "str    " + regm.toString(dstRegId) + ", " ", [fp, #" + to_string(offset) +"]"  + endl;
+        		
         	}
+        	regm.clearRVALUE(dstRegId);
         }
+        
         // TODO get The Value or do nothing
-        code += space + "movs    " + regm.toString(dstRegId) + ", "+ "#MyValue"+endl;
-        fpOffset-=4;
+        auto varName = aInst->getName();
+        regm.insertRVALUE(dstRegId,varName);
+        auto Sym = module->getSymTable()->query(varName);
+        if(Sym->getDims().size()==0)
+        {
+        	auto value = Sym->getInitValue();
+        	auto constVal = dynamic_cast<ConstantValue*>(value);
+        	if(constVal!=nullptr)
+        	{
+        		if(constVal->isInt())
+        		{
+        			auto digit = constVal->getInt();
+        			code += space + "movs    " + regm.toString(dstRegId) + ", "+ "#"+ to_string(digit) +endl;
+        		}
+        		// TODO: the value of float???
+        		else if(constVal->isFloat())
+        		{
+        			auto number = constVal->getFloat();
+        			void*nump = &number;
+        			char bytes[4];
+        			for(int ii=0;ii<4;ii++)
+        			{
+        				bytes[ii] = ((char*)nump)[ii];
+        			}
+        			//int *nump = (int*)malloc(sizeof(int));
+        			//*nump = number;
+        			char ObjValue[50];
+        			//int *mynum = bytes;
+        			void*mynum = bytes;
+        			sprintf(ObjValue,"%d",*(int*)mynum);
+        			code += space + "movt    " + regm.toString(dstRegId) + ", "+ ObjValue +endl;
+        		}
+        	}
+        	else
+        	{
+        		auto valueName = value->getName();
+        		auto val = module->getSymTable()->query(valueName);
+        		auto offset = val->getOffset();
+        		code += space + "ldr     " + regm.toString(dstRegId) + ", [fp, #" + to_string(offset) +"]" + endl;    
+        	}
+        	Sym->setOffset(fpOffset);
+        	fpOffset -= 4;
+        }
+        //TODO Array
+        //code += space + "movs    " + regm.toString(dstRegId) + ", "+ "#MyValue"+endl;
+        
         return {dstRegId, code};
     }
 
@@ -293,6 +343,12 @@ namespace backend{
         /** 
          *code in here
         */
+        auto varName = stInst->getName();
+        auto var = module->getSymTable()->query(varName);
+        auto offset = var->getOffset();
+        //TODO Find srcRegId from AVALUE!!!
+        code += space + "str    " + regm.toString(RegManager::RANY) +  ", [fp, #" + to_string(offset) +"]"  + endl;
+        
         return code;
     }
     pair<RegId, string> 
@@ -511,32 +567,41 @@ namespace backend{
         	{
         		// not array (has init)
         		auto initv = dynamic_cast<ConstantValue *>(initV);
-        		if(type->isInt())
+        		if(initv!=nullptr)
         		{
-        			int number = initv->getInt();
-        			char ObjValue[50];
-        			sprintf(ObjValue,"%d",number);
-        			asmCode+= space + ".word   " + ObjValue +endl;
-        		}
-        		// TODO float???
-        		else if(type->isFloat())
-        		{
-        			float number = initv->getFloat();
-        			//char *nump =(char*)malloc(sizeof(char));
-        			void*nump = &number;
-        			char bytes[4];
-        			for(int ii=0;ii<4;ii++)
+        			if(initv->isInt())
         			{
-        				bytes[ii] = ((char*)nump)[ii];
+        				int number = initv->getInt();
+        				char ObjValue[50];
+        				sprintf(ObjValue,"%d",number);
+        				asmCode+= space + ".word   " + ObjValue +endl;
         			}
-        			//int *nump = (int*)malloc(sizeof(int));
-        			//*nump = number;
-        			char ObjValue[50];
-        			//int *mynum = bytes;
-        			void*mynum = bytes;
-        			sprintf(ObjValue,"%d",*(int*)mynum);
-        			asmCode+= space + ".word   " + ObjValue +endl;
+        			// TODO float???
+        			else if(initv->isFloat())
+        			{
+        				float number = initv->getFloat();
+        				//char *nump =(char*)malloc(sizeof(char));
+        				void*nump = &number;
+        				char bytes[4];
+        				for(int ii=0;ii<4;ii++)
+        				{
+        					bytes[ii] = ((char*)nump)[ii];
+        				}
+        				//int *nump = (int*)malloc(sizeof(int));
+        				//*nump = number;
+        				char ObjValue[50];
+        				//int *mynum = bytes;
+        				void*mynum = bytes;
+        				sprintf(ObjValue,"%d",*(int*)mynum);
+        				asmCode+= space + ".word   " + ObjValue +endl;
         			
+        			}
+        		}
+        		//TODO: Move to IR to exam
+        		else
+        		{
+        			std::cout<<"error: initializer element is not constant"<<endl;
+        			exit(0);
         		}
         	}
         	else if(initV==nullptr)

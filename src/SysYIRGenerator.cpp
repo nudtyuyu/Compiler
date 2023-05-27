@@ -51,7 +51,7 @@ any SysYIRGenerator::visitCompUnit(SysYParser::CompUnitContext *ctx)
 	for (auto *func : ctx->funcDef()) {
 		visitFuncDef(func);
 	}
-	
+	module->setSymTable(builder.getSymTable());
 	return nullptr;
 }
 
@@ -92,6 +92,7 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 			if(globalScope) {
 				auto *globalValue = module->createGlobalValue(name, Type::getPointerType(type), dims, initValue, true);
 				builder.getSymTable()->insert(name, globalValue, dims, initValue, true);
+				
 			}
 			else {
 				auto *allocaInst = builder.createAllocaInst(type, dims, name);
@@ -102,11 +103,17 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 		{
 			auto *initValue = any_cast<Value *>(visitConstInitVal(constdef->constInitVal(), iDims, 0));
 			
-			builder.getSymTable()->insert(name, initValue, {}, initValue, true);
+			//builder.getSymTable()->insert(name, initValue, {}, initValue, true);
 			if(globalScope) {
 				auto *globalValue = module->createGlobalValue(name, type, {}, initValue, true);
+				builder.getSymTable()->insert(name, initValue, {}, initValue, true);
 			}
-			builder.getSymTable()->insert(name, initValue, {}, nullptr, true);
+			else
+			{
+				auto *allocaInst = builder.createAllocaInst(type, {}, name);
+				auto *storeInst = builder.createStoreInst(initValue, allocaInst,{},name);
+				builder.getSymTable()->insert(name, initValue, {}, initValue, true);
+			}
 		}
 	}
 	return values;
@@ -427,11 +434,11 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 				auto *initValue = any_cast<Value *>(visitInitVal(vardef->initVal(), iDims, 0));
 				if(globalScope) {
 					auto *globalValue = module->createGlobalValue(name, Type::getPointerType(type), {}, initValue, false);
-					builder.getSymTable()->insert(name, globalValue, {}, nullptr, false);
+					builder.getSymTable()->insert(name, globalValue, {}, initValue, false);
 				} else {
 					auto *allocaInst = builder.createAllocaInst(type, {}, name);
 					builder.getSymTable()->insert(name, allocaInst, dims, initValue, false);
-					auto *storeInst = builder.createStoreInst(initValue, allocaInst);
+					auto *storeInst = builder.createStoreInst(initValue, allocaInst,{},name);
 				}
 			}
 			else
@@ -913,6 +920,10 @@ any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx) {
 	// cerr << "visit lval: " << ctx->getText() << endl;
 	auto name = ctx->Identifier()->getText();
 	auto *entry = builder.getSymTable()->query(ctx->Identifier()->getText());
+	/*if(entry==nullptr)
+	{
+		entry = module->getGlobalValue(ctx->Identifier()->getText());
+	}*/
 	auto dims = entry->getDims();
 	
 	if (!ctx->exp().empty()) {
@@ -989,7 +1000,13 @@ any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
 			// var
 			auto *baseType = dynamic_cast<PointerType *>(ptr->getType())->getBaseType();
 			// cout<<"ValType: "<<baseType<<endl;
-			auto *loadValue = builder.createLoadInst(ptr,{},newTemp());
+			if(globalScope && builder.getBasicBlock()==nullptr)
+			{
+				cout<<"error: initializer element is not constant"<<endl;
+        		exit(0);
+			}
+			//auto *loadValue = builder.createLoadInst(ptr,{},newTemp());
+			auto *loadValue = builder.createLoadInst(ptr,{},ptr->getName());
 			// cout<<"load value"<<endl;
 			return (Value *)loadValue;
 		}

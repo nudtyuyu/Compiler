@@ -151,6 +151,14 @@ namespace backend {
     	{
     		return RVALUE[reg];
     	}
+    	void clearRVALUE(RegId reg)
+    	{
+    		RVALUE[reg].clear();
+    	}
+    	void insertRVALUE(RegId reg, std::string var)
+    	{
+    		RVALUE[reg].push_back(var);
+    	}
     	bool IsEmpty(RegId reg)
     	{
     		if(RVALUE[reg].size()==0)
@@ -210,11 +218,12 @@ namespace backend {
         //label manager
         map<BasicBlock *, string> bb_labels;
         uint64_t label_no = 0;
-        size_t fpOffset = 0;
+        size_t fpOffset = -8;
 
         
 
     public:
+    	//TODO: add the builder to the CodeGen!!!!
         CodeGen(Module *module) : module(module) {}
         //code_gen function list
         string code_gen();
