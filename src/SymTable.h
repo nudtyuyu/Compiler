@@ -3,6 +3,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 namespace sysy {
 
@@ -34,11 +35,12 @@ private:
     Value *initValue;   // 初始值
     bool constant;
     int addr_offset;    // 汇编中的地址。全局变量为绝对地址，局部变量为相对(fp)地址。
+    std::vector<int> InReg; // This var is in which Regs
 
 public:
     Entry() = delete;
     Entry(Value *_value, const std::vector<Value *> &_dims, Value *_initValue, bool _constant)
-        :value(_value), dims(_dims), initValue(_initValue), constant(_constant), addr_offset(0) {}
+        :value(_value), dims(_dims), initValue(_initValue), constant(_constant), addr_offset(0) {InReg.clear();}
 
 public:
     Value *getValue() const {
@@ -58,6 +60,30 @@ public:
     }
     int getOffset() const {
         return addr_offset;
+    }
+    void addReg(int Reg) {
+    	InReg.push_back(Reg);
+    }
+    void deleteReg(int Reg){
+    	auto iter = std::find(InReg.begin(),InReg.end(),Reg);
+    	InReg.erase(iter);
+    }
+    int getReg()
+    {
+    	if(InReg.size()==0)
+    	{
+    		std::cout<<"ERROR!The Avalue is Empty!"<<std::endl;
+    		exit(0);
+    	}
+    	int len = InReg.size();
+    	return InReg[len-1];
+    }
+    bool isNotInReg()
+    {
+    	if(InReg.size()==0)
+    		return true;
+    	else
+    		return false;
     }
 };
 

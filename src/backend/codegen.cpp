@@ -31,17 +31,21 @@ namespace backend{
             if(bblist.empty()) continue;
             //generate asmcode for each function
             textCode += function_gen(func) + endl;
+            textCode += space + ".size    "+ name + ", " + ".-" + name + endl;
         }
-        code += (dataCode + textCode + endl);
+        code += (dataCode + textCode);
+        code += space + ".section        .note.GNU-stack,\"\",%progbits" +endl;
         return code;
     }
 
     string CodeGen::functionHead_gen(Function *func){
         string code;
         code += space + ".globl " + func->getName() + endl;
+        code += space  + ".syntax unified" + endl;
         code += space + ".p2align " + std::to_string(int_p2align) + endl;
         code += space + ".type " + func->getName() + ", %function" + endl;
         code += func->getName() + ":" + endl;
+        
         return code;
     }
     /**
@@ -116,7 +120,9 @@ namespace backend{
         string code;
         
         // 释放空间(局部变量、函数实参等)
-        code += space + "sub    sp, fp, #28\n";
+        RegManager::RegId dstRegId = regm.AssignReg();
+        code += space + "sub    " + regm.toString(dstRegId) + ", fp, #28" + endl;
+        code += space + "mov    sp, " + regm.toString(dstRegId) + endl;
         // 此处代码待优化：仅恢复使用过的变量寄存器
         code += space + "pop    {r4, r5, r6, r7, r8, r10}\n";
         code += space + "pop    {fp, lr}\n";
@@ -280,7 +286,7 @@ namespace backend{
         	{
         		auto var = Rvalue[j];
         		//TODO find the addr in AVALUE(var)
-        		auto varp = module->getSymTable()->query(var);
+        		auto varp = curBB->getSymTable()->query(var);
         		auto offset = varp->getOffset();
         		code += space + "str    " + regm.toString(dstRegId) + ", " ", [fp, #" + to_string(offset) +"]"  + endl;
         		
@@ -291,7 +297,7 @@ namespace backend{
         // TODO get The Value or do nothing
         auto varName = aInst->getName();
         regm.insertRVALUE(dstRegId,varName);
-        auto Sym = module->getSymTable()->query(varName);
+        auto Sym = curBB->getSymTable()->query(varName);
         if(Sym->getDims().size()==0)
         {
         	auto value = Sym->getInitValue();
@@ -301,7 +307,7 @@ namespace backend{
         		if(constVal->isInt())
         		{
         			auto digit = constVal->getInt();
-        			code += space + "movs    " + regm.toString(dstRegId) + ", "+ "#"+ to_string(digit) +endl;
+        			code += space + "movs   " + regm.toString(dstRegId) + ", "+ "#"+ to_string(digit) +endl;
         		}
         		// TODO: the value of float???
         		else if(constVal->isFloat())
@@ -319,21 +325,26 @@ namespace backend{
         			//int *mynum = bytes;
         			void*mynum = bytes;
         			sprintf(ObjValue,"%d",*(int*)mynum);
-        			code += space + "movt    " + regm.toString(dstRegId) + ", "+ ObjValue +endl;
+        			code += space + "movt   " + regm.toString(dstRegId) + ", "+ ObjValue +endl;
         		}
         	}
         	else
         	{
         		auto valueName = value->getName();
-        		auto val = module->getSymTable()->query(valueName);
-        		auto offset = val->getOffset();
-        		code += space + "ldr     " + regm.toString(dstRegId) + ", [fp, #" + to_string(offset) +"]" + endl;    
+        		//TODO Find the Reg which store the valueName
+        		//auto val = curBB->getSymTable()->query(valueName);
+        		//auto offset = val->getOffset();
+        		//code += space + "ldr     " + regm.toString(dstRegId) + ", [fp, #" + to_string(offset) +"]" + endl;
+        		code += space + "mov    " + regm.toString(dstRegId) + ", "+ regm.toString(RegManager::RANY) +endl; 
+        		   
         	}
         	Sym->setOffset(fpOffset);
         	fpOffset -= 4;
+        	Sym->addReg(dstRegId);
         }
         //TODO Array
         //code += space + "movs    " + regm.toString(dstRegId) + ", "+ "#MyValue"+endl;
+        
         
         return {dstRegId, code};
     }
@@ -344,10 +355,11 @@ namespace backend{
          *code in here
         */
         auto varName = stInst->getName();
-        auto var = module->getSymTable()->query(varName);
+        auto var = curBB->getSymTable()->query(varName);
         auto offset = var->getOffset();
         //TODO Find srcRegId from AVALUE!!!
-        code += space + "str    " + regm.toString(RegManager::RANY) +  ", [fp, #" + to_string(offset) +"]"  + endl;
+        auto srcRegId = var->getReg();
+        code += space + "str    " + regm.toString(RegManager::RegId(srcRegId)) +  ", [fp, #" + to_string(offset) +"]"  + endl;
         
         return code;
     }
@@ -364,6 +376,38 @@ namespace backend{
         /** 
          *code in here
         */
+        if(!retInst->hasReturnValue())
+        {
+        	code = "";
+        	return code;
+        }
+        RegManager::RegId dstRegId = regm.AssignReg();
+        if(!regm.IsEmpty(dstRegId))
+        {
+        	auto Rvalue = regm.getRVALUE(dstRegId);
+        	for(int j=0;j<Rvalue.size();j++)
+        	{
+        		auto var = Rvalue[j];
+        		//TODO find the addr in AVALUE(var)
+        		auto varp = curBB->getSymTable()->query(var);
+        		auto offset = varp->getOffset();
+        		code += space + "str    " + regm.toString(dstRegId) + ", " ", [fp, #" + to_string(offset) +"]"  + endl;
+        		
+        	}
+        	regm.clearRVALUE(dstRegId);
+        }
+        auto ReturnVal = retInst->getReturnValue();
+        auto constVal = dynamic_cast<ConstantValue*>(ReturnVal);
+        if(constVal!=nullptr)
+        {
+        	//TODO: var
+        	if(constVal->isInt())
+        		{
+        			auto digit = constVal->getInt();
+        			code += space + "movs   " + regm.toString(dstRegId) + ", "+ "#"+ to_string(digit) +endl;
+        		}
+        }
+        code += space + "mov    " + regm.toString(RegManager::RegId(0)) + ", " + regm.toString(dstRegId) + endl;
         return code;
     }
     string CodeGen::uncondBrInst_gen(UncondBrInst *ubInst){
@@ -448,7 +492,7 @@ namespace backend{
         {
             LoadInst *ldInst = dynamic_cast<LoadInst *>(instr);
             tmp = loadInst_gen(ldInst, RegManager::RANY);
-            code += M_emitComment("load inst");
+            //code += M_emitComment("load inst");
             code += tmp.second;
             dstRegId = tmp.first;
             break;
@@ -456,7 +500,7 @@ namespace backend{
         case Instruction::kStore :
         {
             StoreInst *stInst = dynamic_cast<StoreInst *>(instr);
-            code += M_emitComment("store inst");
+            //code += M_emitComment("store inst");
             code += storeInst_gen(stInst);
             return code;
             break;
@@ -465,7 +509,7 @@ namespace backend{
         {
             AllocaInst *aInst = dynamic_cast<AllocaInst *>(instr);
             tmp = allocaInst_gen(aInst, RegManager::RANY);
-            code += M_emitComment("alloca inst");
+            //code += M_emitComment("alloca inst");
             code += tmp.second;
             dstRegId = tmp.first;
             break;
@@ -473,7 +517,7 @@ namespace backend{
         case Instruction::kReturn:
         {
             ReturnInst *retInst = dynamic_cast<ReturnInst *>(instr);
-            code += M_emitComment("return inst");
+            //code += M_emitComment("return inst");
             code += returnInst_gen(retInst);
             return code;
             break;
