@@ -424,7 +424,7 @@ namespace backend{
         		//TODO find the addr in AVALUE(var)
         		auto varp = curBB->getSymTable()->query(var);
         		auto offset = varp->getOffset();
-        		code += space + "str    " + regm.toString(dstRegId) + ", " ", [fp, #" + to_string(offset) +"]"  + endl;
+        		code += space + "str    " + regm.toString(dstRegId) +  ", [fp, #" + to_string(offset) +"]"  + endl;
         		
         	}
         	regm.clearRVALUE(dstRegId);
@@ -433,13 +433,43 @@ namespace backend{
         auto constVal = dynamic_cast<ConstantValue*>(ReturnVal);
         if(constVal!=nullptr)
         {
-        	//TODO: var
+        	//TODO: float
         	if(constVal->isInt())
         		{
         			auto digit = constVal->getInt();
         			code += space + "movs   " + regm.toString(dstRegId) + ", "+ "#"+ to_string(digit) +endl;
         		}
         }
+        else
+        {
+        	auto valueName = ReturnVal->getName();
+        	auto val = curBB->getSymTable()->query(valueName);
+        	auto glbMap = module->getGlobalValues();
+        	if(glbMap->find(valueName)!=glbMap->end())
+        	{
+        		code += space + "movw   " + regm.toString(dstRegId) + ", "+ "#:lower16:"+ valueName +endl;
+        		code += space + "movt   " + regm.toString(dstRegId) + ", "+ "#:upper16:"+ valueName +endl;
+        		code += space + "ldr    " + regm.toString(dstRegId) + ", "+ "[" + regm.toString(dstRegId) + "]" +endl;
+        	}
+        	else
+        	{
+        		auto dims = val->getDims();
+        		if(dims.size()==0)
+        		{
+        			if(!val->isNotInReg())
+        			{
+        				auto srcRegId = val->getReg();
+        				code += space + "mov    " + regm.toString(dstRegId) + ", " + regm.toString(RegManager::RegId(srcRegId)) + endl;
+        			}
+        			else
+        			{
+        				auto offset = val->getOffset();
+        				code += space + "ldr    " + regm.toString(dstRegId) + ", [fp, #" + to_string(offset) +"]" + endl;
+        			}
+        		}
+        		//TODO: array[offset]
+       		}
+       	}
         code += space + "mov    " + regm.toString(RegManager::RegId(0)) + ", " + regm.toString(dstRegId) + endl;
         return code;
     }
