@@ -26,6 +26,10 @@ public:
     Entry *insert(const std::string &name, Value *value, const std::vector<Value *> &dims, Value *initValue, bool constant);
     Entry *query(const std::string &name);
 
+public:
+    const auto &getEntries() const {
+        return entries;
+    }
 };
 
 class SymTable::Entry {
@@ -34,7 +38,7 @@ private:
     std::vector<Value *> dims;
     Value *initValue;   // 初始值
     bool constant;
-    int addr_offset;    // 汇编中的地址。全局变量为绝对地址，局部变量为相对(fp)地址。
+    int addr_offset;    // 汇编中的地址。全局变量为绝对地址，局部变量为相对(fp)地址。考虑到已分配的不会是0，用0表示未分配。
     std::vector<int> InReg; // This var is in which Regs
 
 public:

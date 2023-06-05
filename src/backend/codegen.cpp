@@ -1,6 +1,8 @@
 #include "codegen.hpp"
 #include <string>
-#include<iostream>
+#include <queue>
+#include <iostream>
+
 namespace backend{
     using RegId = RegManager::RegId;
     #define out std::cout
@@ -79,28 +81,59 @@ namespace backend{
         string code;
         int spOffset = 0;
         fpOffset = -8;
+        auto arguments = func->getEntryBlock()->getArguments();
+        static std::set<SymTable *> symTables;
+        symTables.clear();
         
         // preserve callee-saved registers (R4-R8, R10, fp, lr)
         code += space + "push   {fp, lr}\n";
         code += space + "add    fp, sp, #4\n";
         spOffset = -4;
-        // 此处代码待优化：仅保存使用过的变量寄存器
         code += space + "push   {r4, r5, r6, r7, r8, r10}\n";
         spOffset += -4 * 6;
-        // 此处代码待补充：为局部变量分配空间
-        // code += space + "sub    sp, sp, #x";
-        // arguments & return value (4 bytes)
-        auto arguments = func->getEntryBlock()->getArguments();
-        code += space + "sub    sp, sp, #" + to_string(std::min(4ul, arguments.size()) * 4) + "\n";
+
+        // arguments & local variebles
         for (size_t i = 0; i < arguments.size(); ++i) {
             if (i < 4) {
-                paramsStOffset[arguments[i]] = spOffset;
                 spOffset -= 4;
-                code += space + "str    " + regm.toString(RegId(i)) + ", [fp, #" + to_string(spOffset) + "]\n";
+                code += space + "str    " + regm.toString(RegId(i)) + ", [fp, #" + to_string(spOffset) + "] @ " + arguments[i]->getName() + "\n";
+                func->getSymTable()->query(arguments[i]->getName())->setOffset(spOffset);
             } else {
-                paramsStOffset[arguments[i]] = (i - 3) * 4;
+                func->getSymTable()->query(arguments[i]->getName())->setOffset((i - 3) * 4);
             }
         }
+        for (const auto &basicBlock : func->getBasicBlocks()) {
+            symTables.insert(basicBlock->getSymTable());
+        }
+        for (const auto *symTable : symTables) {
+            for (auto &mapPair : symTable->getEntries()) {
+                auto name = mapPair.first;
+                auto *entry = mapPair.second;
+                int elemSize, count = 1;
+
+                if (entry->getOffset() != 0) // already allocated
+                    continue;
+
+                if (!entry->getDims().empty()) {
+                    elemSize = entry->getValue()->getType()->as<PointerType>()->getBaseType()->getSize();
+                    if (dynamic_cast<ConstantValue *>(entry->getDims().at(0))->getInt() != 0) {
+                        for (auto *dim : entry->getDims()) {
+                            count *= dynamic_cast<ConstantValue *>(dim)->getInt();
+                        }
+                    }
+                } else if (entry->isConstant()) {
+                    elemSize = entry->getValue()->getType()->getSize();
+                } else {
+                    elemSize = entry->getValue()->getType()->as<PointerType>()->getBaseType()->getSize();
+                }
+                spOffset -= count * elemSize;
+                code += space + "sub    sp, sp, #" + to_string(count * elemSize) + " @ " + name + "\n";
+                entry->setOffset(spOffset + 1);
+            }
+        }
+
+
+        // return value
         if (!func->getReturnType()->isVoid()) {
             retValueStOffset = spOffset;
             spOffset -= 4;

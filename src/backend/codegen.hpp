@@ -32,11 +32,9 @@
 using namespace sysy;
 using std::string;
 using std::map;
-using std::set;
 using std::vector;
 using std::to_string;
 using std::pair;
-using std::find;
 
 #define Macro_ERROR_MSG(...) \
 do{\
