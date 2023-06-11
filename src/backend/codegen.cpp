@@ -153,7 +153,7 @@ namespace backend{
         string code;
         
         // 释放空间(局部变量、函数实参等)
-        RegManager::RegId dstRegId = regm.AssignReg();
+        RegManager::RegId dstRegId = regm.AssignReg(1)[0];
         code += space + "sub    " + regm.toString(dstRegId) + ", fp, #28" + endl;
         code += space + "mov    sp, " + regm.toString(dstRegId) + endl;
         // 此处代码待优化：仅恢复使用过的变量寄存器
@@ -311,7 +311,7 @@ namespace backend{
         /** 
          *code in here
         */
-        dstRegId = regm.AssignReg();
+        dstRegId = regm.AssignReg(1)[0];
         if(!regm.IsEmpty(dstRegId))
         {
         	auto Rvalue = regm.getRVALUE(dstRegId);
@@ -371,8 +371,8 @@ namespace backend{
         		code += space + "mov    " + regm.toString(dstRegId) + ", "+ regm.toString(RegManager::RANY) +endl; 
         		   
         	}
-        	Sym->setOffset(fpOffset);
-        	fpOffset -= 4;
+        	//Sym->setOffset(fpOffset);
+        	//fpOffset -= 4;
         	Sym->addReg(dstRegId);
         }
         //TODO Array
@@ -387,7 +387,7 @@ namespace backend{
         /** 
          *code in here
         */
-        auto varName = stInst->getName();
+        auto varName = stInst->getPointer()->getName();
         auto var = curBB->getSymTable()->query(varName);
         auto offset = var->getOffset();
         //TODO Find srcRegId from AVALUE!!!
@@ -414,7 +414,7 @@ namespace backend{
         	code = "";
         	return code;
         }
-        RegManager::RegId dstRegId = regm.AssignReg();
+        RegManager::RegId dstRegId = regm.AssignReg(1)[0];
         if(!regm.IsEmpty(dstRegId))
         {
         	auto Rvalue = regm.getRVALUE(dstRegId);

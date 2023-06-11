@@ -123,27 +123,86 @@ namespace backend {
     	}
     
     public:
-    	RegId AssignReg()
+    	std::vector<RegId> AssignReg(int Number)
     	{
     		// Really Really Easy!
-    		for(int i=4;i<=12;i++)
-    		{
-    			if(i==11 || i==9)
-    			{
-    				continue;
-    			}
-    			else if(RVALUE[RegId(i)].size()==0)
-    			{
-    				return RegId(i);
-    			}
-    		}
+    		std::vector<RegId> RegList;
     		srand((unsigned)time(NULL));
-    		int label = 4+rand()%13;
-    		while(label==11 || label==9)
+    		if(Number==2)
     		{
-    			label = 4+rand()%13;
+    			int count=0;
+    			int r0 = -1;
+    			while(count<2)
+    			{
+    				for(int i=4;i<=12;i++)
+    				{
+    					if(count>=2)
+    					{
+    						break;
+    					}
+    					if(i==11 || i==9)
+    					{
+    						continue;
+    					}
+    					else if(RVALUE[RegId(i)].size()==0)
+    					{
+    						RegList.push_back(RegId(i));
+    						count++;
+    						r0=i;
+    					}
+    				}
+    				if(count==1)
+    				{
+    					int label = 4+rand()%13;
+    					while((label==11 || label==9) || label==r0)
+    					{
+    						label = 4+rand()%13;
+    					}
+    					RegList.push_back(RegId(label));
+    					count++;
+    				}
+    				else if(count==0)
+    				{
+    					int label0 = 4+rand()%13;
+    					int label1 = 4+rand()%13;
+    					while(label0==11 || label0==9)
+    					{
+    						label0 = 4+rand()%13;
+    					}
+    					while((label1==11 || label1==9) || label1==label0)
+    					{
+    						label1 = 4+rand()%13;
+    					}
+    					RegList.push_back(RegId(label0));
+    					RegList.push_back(RegId(label1));
+    					count+=2;
+    				}
+    			}
     		}
-    		return RegId(label);
+    		
+    		else if(Number==1)
+    		{
+    			for(int i=4;i<=12;i++)
+    			{
+    				if(i==11 || i==9)
+    				{
+    					continue;
+    				}
+    				else if(RVALUE[RegId(i)].size()==0)
+    				{
+    					RegList.push_back(RegId(i));
+    					return RegList;
+    				}
+    			}
+    		
+    			int label = 4+rand()%13;
+    			while(label==11 || label==9)
+    			{
+    				label = 4+rand()%13;
+    			}
+    			RegList.push_back(RegId(label));
+    		}
+    		return RegList;
     	}
     	std::vector<std::string> getRVALUE(RegId reg)
     	{
