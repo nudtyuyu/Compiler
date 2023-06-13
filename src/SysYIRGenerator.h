@@ -73,6 +73,8 @@ public:
 
     std::any visitInitVal(SysYParser::InitValContext *context, const std::vector<int> &dims, int layer);
 
+    void storeLocalArray(Value *base, Value *initVal);
+
     virtual std::any visitFuncDef(SysYParser::FuncDefContext *context) override;
 
     virtual std::any visitFuncType(SysYParser::FuncTypeContext *context) override;

@@ -771,6 +771,9 @@ protected:
 
 public:
   Value *getElement(int index);
+  const std::vector<int> &getIndices() const {
+    return indices;
+  }
 
 public:
   void generateCode(std::ostream &out) const {

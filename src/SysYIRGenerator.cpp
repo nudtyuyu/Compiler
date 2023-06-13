@@ -41,6 +41,7 @@ any SysYIRGenerator::visitCompUnit(SysYParser::CompUnitContext *ctx)
 	builder.setModule(unit);
 	// ConstInitListName = 0;
 	InitListName = 0;
+	globalScope = false;
 
 	for(auto decl:ctx->decl())
 	{
@@ -97,6 +98,8 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 			else {
 				auto *allocaInst = builder.createAllocaInst(type, dims, name);
 				builder.getSymTable()->insert(name, allocaInst, dims, initValue, true);
+				// 待补充：store数组
+				storeLocalArray(allocaInst, initValue);
 			}
 		}
 		else
@@ -414,6 +417,7 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 					auto *allocaInst = builder.createAllocaInst(type, dims, name);
 					builder.getSymTable()->insert(name, allocaInst, dims, initValue, false);
 					// 待补充：store数组
+					storeLocalArray(allocaInst, initValue);
 				}
 			}
 			else
@@ -465,6 +469,22 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 		
 	}
 	return values;
+}
+
+void SysYIRGenerator::storeLocalArray(Value *base, Value *initVal) {
+	auto *initList = dynamic_cast<InitList *>(initVal);
+	auto indices = initList->getIndices();
+	for (size_t i = 0; i < indices.size(); ++i) {
+		Value *value = initList->getOperand(i);
+		if (value->isInitList())
+			storeLocalArray(base, value);
+		else if (value->isFloat() || value->isInt()) {
+			auto *addr = builder.createPAddInst(base, ConstantValue::get(indices[i] * 4, to_string(indices[i] * 4)), newTemp());
+			builder.createStoreInst(value, addr);
+		} else {
+			cout << "storeLocalArray: initial value of error type\n";
+		}
+	}
 }
 
 // void SysYIRGenerator::visitInitVal2(SysYParser::InitValContext *ctx,InitList* values)
