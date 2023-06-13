@@ -768,7 +768,6 @@ any SysYIRGenerator::visitFuncDef(SysYParser::FuncDefContext *ctx) {
 		auto *argument = entry->createArgument(paramTypes[i], paramDims[i], paramNames[i]);
 		function->getSymTable()->insert(paramNames[i], argument, paramDims[i], nullptr, false);
 	}
-	// symTable.view();
 	visitBlock(ctx->block());
 
 	return function;
@@ -784,6 +783,7 @@ any SysYIRGenerator::visitFuncType(SysYParser::FuncTypeContext *ctx) {
 }
 
 any SysYIRGenerator::visitBlock(SysYParser::BlockContext *ctx) {
+	// cerr << "visit block " << ctx->getSourceInterval().toString() << "\n";
 	for (auto *blockItem: ctx->blockItem())
 		visitBlockItem(blockItem);
 	return (Value *)nullptr;
@@ -1005,8 +1005,8 @@ any SysYIRGenerator::visitPrimaryExp(SysYParser::PrimaryExpContext *ctx)
 				cout<<"error: initializer element is not constant"<<endl;
         		exit(0);
 			}
-			//auto *loadValue = builder.createLoadInst(ptr,{},newTemp());
-			auto *loadValue = builder.createLoadInst(ptr,{},ptr->getName());
+			auto *loadValue = builder.createLoadInst(ptr,{},newTemp());
+			// auto *loadValue = builder.createLoadInst(ptr,{},ptr->getName());
 			// cout<<"load value"<<endl;
 			return (Value *)loadValue;
 		}

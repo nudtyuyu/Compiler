@@ -1,7 +1,9 @@
 #include "codegen.hpp"
+#include <cstdlib>
 #include <string>
 #include <queue>
 #include <iostream>
+#include <vector>
 
 namespace backend{
     using RegId = RegManager::RegId;
@@ -167,15 +169,15 @@ namespace backend{
     	//fpOffset = -8;
         curFunc = func;
         clearFunctionRecord(func);
+        string code;
+        string funcHead = functionHead_gen(func);
+        string prologueCode = prologueCode_gen(func);
         string bbCode;
         auto bbs = func->getBasicBlocks();
         for(auto iter = bbs.begin(); iter != bbs.end(); ++iter){
             auto bb = iter->get();
             bbCode += basicBlock_gen(bb);
         }
-        string code;
-        string funcHead = functionHead_gen(func);
-        string prologueCode = prologueCode_gen(func);
         string epilogueCode = epilogueCode_gen(func);
         string literalPoolsCode = literalPoolsCode_gen(func);
         //
@@ -406,9 +408,6 @@ namespace backend{
     }
     string CodeGen::returnInst_gen(ReturnInst *retInst){
         string code;
-        /** 
-         *code in here
-        */
         if(!retInst->hasReturnValue())
         {
         	code = "";
@@ -445,7 +444,7 @@ namespace backend{
         	auto valueName = ReturnVal->getName();
         	auto val = curBB->getSymTable()->query(valueName);
         	auto glbMap = module->getGlobalValues();
-        	if(glbMap->find(valueName)!=glbMap->end())
+        	if(module->getGlobalValue(valueName))
         	{
         		code += space + "movw   " + regm.toString(dstRegId) + ", "+ "#:lower16:"+ valueName +endl;
         		code += space + "movt   " + regm.toString(dstRegId) + ", "+ "#:upper16:"+ valueName +endl;
@@ -757,4 +756,57 @@ namespace backend{
         return code;
     }
 
+    RegId RegManager::AValueTable::getReg(Value *value) const {
+        auto result = table.find(value);
+        return (result == table.end() ? RNONE : result->second->reg);
+    }
+
+    int RegManager::AValueTable::getMem(Value *value) const {
+        auto result = table.find(value);
+        return (result == table.end() ? 0 : result->second->mem);
+    }
+
+    void RegManager::AValueTable::setReg(Value *value, RegId reg) {
+        auto result = table.find(value);
+        auto entry = (result == table.end() ? new Entry() : result->second);
+        entry->reg = reg;
+    }
+
+    void RegManager::AValueTable::setMem(Value *value, int mem) {
+        auto result = table.find(value);
+        auto entry = (result == table.end() ? new Entry() : result->second);
+        entry->mem = mem;
+    }
+    
+    std::vector<RegId> RegManager::query(const std::vector<Value *> &values) {
+        std::vector<RegId> result;
+        for (auto *value : values) {
+            RegId reg = aTable.getReg(value);
+            if (reg == RNONE) {
+                for (auto r : UserRegs) {
+                    if (IsEmpty(r)) {
+                        // emit ldr instruction
+                        aTable.setReg(value, reg);
+                        reg = r;
+                    }
+                }
+            }
+            while (reg == RNONE) {
+                reg = RegId(rand() % 11);
+                for (auto r : result) {
+                    if (reg == r) {
+                        reg = RNONE;
+                        break;
+                    }
+                }
+                // emit str instructions
+                // aTable.setReg(xxxxx, RNONE)
+                // reset RVALUE
+                aTable.setReg(value, reg);
+            }
+            result.push_back(reg);
+        }
+
+        return result;
+    }
 }//namespace backend

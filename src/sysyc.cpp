@@ -30,15 +30,12 @@ int main(int argc, char **argv) {
   SysYLexer lexer(&input);
   CommonTokenStream tokens(&lexer);
   SysYParser parser(&tokens);
-  //auto moduleAST = parser.module();
   
   auto compile = parser.compUnit();
 
   sysy::SysYIRGenerator generator;
   generator.visitCompUnit(compile);
 
-  //SysYIRGenerator generator;
-  //generator.visitModule(moduleAST);
   auto moduleIR = generator.get();
   //only generate SysY IR code
   if(genir){

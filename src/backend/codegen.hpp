@@ -110,9 +110,28 @@ namespace backend {
             if(reg == RANY) return "RANY";
             return "r" + to_string(reg);
         }
+        class AValueTable {
+            private:
+            // enum Kind {global, local, temp, arg};
+            struct Entry {
+                RegId reg;
+                int mem;
+                // Kind kind;
+            };
+            std::map<Value *, Entry *> table;
+
+            public:
+            RegId getReg(Value *value) const;
+            int getMem(Value *value) const;
+            void setReg(Value *value, RegId reg);
+            void setMem(Value *value, int mem);
+        };
     private:
+        static constexpr const RegId UserRegs[] = {R0, R1, R2, R3, R4, R5, R6, R7, R8, R10, R12};
     	std::map<RegId,std::vector<std::string> > RVALUE;
+        AValueTable aTable;
     public:
+
     	RegManager()
     	{
     		for(int i=0;i<16;i++)
@@ -225,7 +244,7 @@ namespace backend {
     		else
     			return false;
     	}
-    	
+    	std::vector<RegId> query(const std::vector<Value *> &values = {}); // 指令请求使用value, 返回包含该值的寄存器，如果没有就分配
     };
 
     class Operand{
