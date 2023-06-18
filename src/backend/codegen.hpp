@@ -82,7 +82,8 @@ namespace backend {
                         srcReg0 + ", " + srcReg1 + endl;
     }
     //
-    class RegManager{  
+    class RegManager{
+    	friend class CodeGen;  
     public:
         //{0,1,2,3,4,5,6,7,8,9,10};
         enum RegId : unsigned {
@@ -244,7 +245,7 @@ namespace backend {
     		else
     			return false;
     	}
-    	std::vector<RegId> query(const std::vector<Value *> &values = {}); // 指令请求使用value, 返回包含该值的寄存器，如果没有就分配
+    	pair<std::vector<RegId>,string> query(const std::vector<Value *> &values = {}); // 指令请求使用value, 返回包含该值的寄存器，如果没有就分配
     };
 
     class Operand{
