@@ -827,8 +827,10 @@ namespace backend{
                 for (auto r : UserRegs) {
                     if (IsEmpty(r)) {
                         // emit ldr instruction
-                        code+="//ldr instruction\n";
-                        aTable.setReg(value, reg);
+                        auto offset = aTable.getMem(value);
+                        code += space + "ldr    " + toString(r) + ", "+ "[fp, #" + to_string(offset)+ "]" +endl;
+                        //code+="//ldr instruction\n";
+                        aTable.setReg(value, r);
                         reg = r;
                         break;
                     }
