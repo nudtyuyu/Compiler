@@ -391,8 +391,9 @@ namespace backend{
         	//fpOffset -= 4;
         	//Sym->addReg(dstRegId);
         	//std::cout<< space << "symValue*: " << varName<<space<<Sym->getValue() << endl;
-        	regm.aTable.setReg(Sym->getValue(),dstRegId);
-        	auto myreg = regm.aTable.getReg(Sym->getValue());
+        	regm.aTable.setReg(value,dstRegId);
+        	//regm.aTable.setReg(Sym->getValue()
+        	//auto myreg = regm.aTable.getReg(Sym->getValue());
         	//std::cout<< space << "The reg I set: "<< regm.toString(myreg)<< endl;
         }
         //TODO Array
@@ -415,7 +416,7 @@ namespace backend{
         //TODO Find srcRegId from AVALUE!!!
         //std::cout<< space << "var1Value*: " << varName <<space<<var1 << endl;
         std::vector<Value*> values;
-        values.push_back(var1);
+        values.push_back(stInst->getValue());
         auto tmp = regm.query(values);
         auto srcRegId = tmp.first[0];
         auto extraCode = tmp.second;
@@ -828,7 +829,7 @@ namespace backend{
                     if (IsEmpty(r)) {
                         // emit ldr instruction
                         auto offset = aTable.getMem(value);
-                        code += space + "ldr    " + toString(r) + ", "+ "[fp, #" + to_string(offset)+ "]" +endl;
+                        code += space + "ldr    " + toString(r) + ", "+ "[fp, #" + to_string(offset)+ "]" + " @ There is something wrong with array"+endl;
                         //code+="//ldr instruction\n";
                         aTable.setReg(value, r);
                         reg = r;
