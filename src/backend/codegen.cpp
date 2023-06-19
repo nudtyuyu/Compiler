@@ -96,12 +96,16 @@ namespace backend{
 
         // arguments & local variebles
         for (size_t i = 0; i < arguments.size(); ++i) {
+        	auto pointer = func->getSymTable()->query(arguments[i]->getName());
             if (i < 4) {
                 spOffset -= 4;
                 code += space + "str    " + regm.toString(RegId(i)) + ", [fp, #" + to_string(spOffset) + "] @ " + arguments[i]->getName() + "\n";
-                func->getSymTable()->query(arguments[i]->getName())->setOffset(spOffset);
+                
+                pointer->setOffset(spOffset);
+                regm.aTable.setMem(pointer->getValue(),spOffset);
             } else {
-                func->getSymTable()->query(arguments[i]->getName())->setOffset((i - 3) * 4);
+                pointer->setOffset((i - 3) * 4);
+                regm.aTable.setMem(pointer->getValue(),(i - 3) * 4);
             }
         }
         for (const auto &basicBlock : func->getBasicBlocks()) {
@@ -130,7 +134,8 @@ namespace backend{
                 }
                 spOffset -= count * elemSize;
                 code += space + "sub    sp, sp, #" + to_string(count * elemSize) + " @ " + name + "\n";
-                entry->setOffset(spOffset + 1);
+                entry->setOffset(spOffset);
+                regm.aTable.setMem(entry->getValue(),spOffset);
             }
         }
 
@@ -322,7 +327,8 @@ namespace backend{
         		auto var = Rvalue[j];
         		//TODO find the addr in AVALUE(var)
         		auto varp = curBB->getSymTable()->query(var);
-        		auto offset = varp->getOffset();
+        		//auto offset = varp->getOffset();
+        		auto offset = regm.aTable.getMem(varp->getValue());
         		code += space + "str    " + regm.toString(dstRegId) + ", " ", [fp, #" + to_string(offset) +"]"  + endl;
         		
         	}
@@ -365,17 +371,30 @@ namespace backend{
         	}
         	else
         	{
-        		auto valueName = value->getName();
+        		//auto valueName = value->getName();
+        		std::vector<Value*> values;
+        		//value = Sym->getValue();
+        		values.push_back(value);
+        		auto tmp = regm.query(values);
+        		auto extraCode = tmp.second;
+        		auto Regs = tmp.first;
+        		auto srcReg = Regs[0];
         		//TODO Find the Reg which store the valueName
         		//auto val = curBB->getSymTable()->query(valueName);
         		//auto offset = val->getOffset();
         		//code += space + "ldr     " + regm.toString(dstRegId) + ", [fp, #" + to_string(offset) +"]" + endl;
-        		code += space + "mov    " + regm.toString(dstRegId) + ", "+ regm.toString(RegManager::RANY) +endl; 
+        		code += extraCode;
+        		code += space + "mov    " + regm.toString(dstRegId) + ", "+ regm.toString(srcReg) +endl; 
         		   
         	}
         	//Sym->setOffset(fpOffset);
         	//fpOffset -= 4;
-        	Sym->addReg(dstRegId);
+        	//Sym->addReg(dstRegId);
+        	//std::cout<< space << "symValue*: " << varName<<space<<Sym->getValue() << endl;
+        	regm.aTable.setReg(value,dstRegId);
+        	//regm.aTable.setReg(Sym->getValue()
+        	//auto myreg = regm.aTable.getReg(Sym->getValue());
+        	//std::cout<< space << "The reg I set: "<< regm.toString(myreg)<< endl;
         }
         //TODO Array
         //code += space + "movs    " + regm.toString(dstRegId) + ", "+ "#MyValue"+endl;
@@ -391,9 +410,17 @@ namespace backend{
         */
         auto varName = stInst->getPointer()->getName();
         auto var = curBB->getSymTable()->query(varName);
-        auto offset = var->getOffset();
+        auto var1 = stInst->getPointer();
+        auto offset = regm.aTable.getMem(var1);
+        //auto offset = var->getOffset();
         //TODO Find srcRegId from AVALUE!!!
-        auto srcRegId = var->getReg();
+        //std::cout<< space << "var1Value*: " << varName <<space<<var1 << endl;
+        std::vector<Value*> values;
+        values.push_back(stInst->getValue());
+        auto tmp = regm.query(values);
+        auto srcRegId = tmp.first[0];
+        auto extraCode = tmp.second;
+        code += extraCode; 
         code += space + "str    " + regm.toString(RegManager::RegId(srcRegId)) +  ", [fp, #" + to_string(offset) +"]"  + endl;
         
         return code;
@@ -422,7 +449,11 @@ namespace backend{
         		auto var = Rvalue[j];
         		//TODO find the addr in AVALUE(var)
         		auto varp = curBB->getSymTable()->query(var);
-        		auto offset = varp->getOffset();
+        		//std::vector<Value*> values;
+        		//values.push_back(varp->getValue());
+        		//auto offset = regm.query(values);
+        		auto offset = regm.aTable.getMem(varp->getValue());
+        		//auto offset = varp->getOffset();
         		code += space + "str    " + regm.toString(dstRegId) +  ", [fp, #" + to_string(offset) +"]"  + endl;
         		
         	}
@@ -455,16 +486,22 @@ namespace backend{
         		auto dims = val->getDims();
         		if(dims.size()==0)
         		{
-        			if(!val->isNotInReg())
+        			//auto tmp = regm.query(var->getValue());
+        			//auto srcRegId = tmp.second;
+        			//auto extraCode =
+        			auto srcRegId = regm.aTable.getReg(val->getValue()); 
+        			auto offset = regm.aTable.getMem(val->getValue());
+        			if(srcRegId!=RegManager::RNONE)
         			{
-        				auto srcRegId = val->getReg();
+        				//auto srcRegId = val->getReg();
         				code += space + "mov    " + regm.toString(dstRegId) + ", " + regm.toString(RegManager::RegId(srcRegId)) + endl;
         			}
         			else
         			{
-        				auto offset = val->getOffset();
+        				//auto offset = val->getOffset();
         				code += space + "ldr    " + regm.toString(dstRegId) + ", [fp, #" + to_string(offset) +"]" + endl;
         			}
+        			
         		}
         		//TODO: array[offset]
        		}
@@ -758,36 +795,45 @@ namespace backend{
 
     RegId RegManager::AValueTable::getReg(Value *value) const {
         auto result = table.find(value);
-        return (result == table.end() ? RNONE : result->second->reg);
+        return (result == table.end()) ? RNONE : result->second->reg;
     }
 
     int RegManager::AValueTable::getMem(Value *value) const {
         auto result = table.find(value);
-        return (result == table.end() ? 0 : result->second->mem);
+        return (result == table.end() )? 0 : result->second->mem;
     }
 
     void RegManager::AValueTable::setReg(Value *value, RegId reg) {
         auto result = table.find(value);
-        auto entry = (result == table.end() ? new Entry() : result->second);
+        auto entry = (result == table.end()) ? new Entry() : result->second;
         entry->reg = reg;
+        table[value] = entry;
+        //std::cout<<"Set Reg: "<< toString(reg)<<endl;
     }
 
     void RegManager::AValueTable::setMem(Value *value, int mem) {
         auto result = table.find(value);
-        auto entry = (result == table.end() ? new Entry() : result->second);
+        auto entry = (result == table.end()) ? new Entry() : result->second;
         entry->mem = mem;
+        table[value] = entry;
     }
     
-    std::vector<RegId> RegManager::query(const std::vector<Value *> &values) {
+    pair<std::vector<RegId>,string> RegManager::query(const std::vector<Value *> &values) {
         std::vector<RegId> result;
+        string code = "";
         for (auto *value : values) {
             RegId reg = aTable.getReg(value);
+            //std::cout<< "// My Reg is: " << toString(reg) << space;
             if (reg == RNONE) {
                 for (auto r : UserRegs) {
                     if (IsEmpty(r)) {
                         // emit ldr instruction
-                        aTable.setReg(value, reg);
+                        auto offset = aTable.getMem(value);
+                        code += space + "ldr    " + toString(r) + ", "+ "[fp, #" + to_string(offset)+ "]" + " @ There is something wrong with array"+endl;
+                        //code+="//ldr instruction\n";
+                        aTable.setReg(value, r);
                         reg = r;
+                        break;
                     }
                 }
             }
@@ -807,6 +853,6 @@ namespace backend{
             result.push_back(reg);
         }
 
-        return result;
+        return {result,code};
     }
 }//namespace backend
