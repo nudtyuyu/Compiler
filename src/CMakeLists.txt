@@ -23,7 +23,7 @@ add_executable(sysyc
 target_include_directories(sysyc PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(sysyc PRIVATE "backend")
 target_include_directories(sysyc PRIVATE ".")
-target_compile_options(sysyc PRIVATE -Wall -Wno-unused-parameter -Wno-unused-function -Wno-unused-variable)
+target_compile_options(sysyc PRIVATE -O0 -Wall -Wno-unused-parameter -Wno-unused-function -Wno-unused-variable)
 target_link_libraries(sysyc PRIVATE SysYParser)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)

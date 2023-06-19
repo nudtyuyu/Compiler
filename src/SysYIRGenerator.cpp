@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <iostream>
 #include <memory>
+#include <pthread.h>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -92,12 +93,10 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 			auto *initValue = std::any_cast<Value *>(visitConstInitVal(constdef->constInitVal(), iDims, 0));
 			if(globalScope) {
 				auto *globalValue = module->createGlobalValue(name, Type::getPointerType(type), dims, initValue, true);
-				builder.getSymTable()->insert(name, globalValue, dims, initValue, true);
-				
-			}
-			else {
+				builder.getSymTable()->insert(name, globalValue, dims, initValue, true, SymTableEntry::GLOBAL);
+			} else {
 				auto *allocaInst = builder.createAllocaInst(type, dims, name);
-				builder.getSymTable()->insert(name, allocaInst, dims, initValue, true);
+				builder.getSymTable()->insert(name, allocaInst, dims, initValue, true, SymTableEntry::LOCAL);
 				// 待补充：store数组
 				storeLocalArray(allocaInst, initValue);
 			}
@@ -109,13 +108,13 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 			//builder.getSymTable()->insert(name, initValue, {}, initValue, true);
 			if(globalScope) {
 				auto *globalValue = module->createGlobalValue(name, type, {}, initValue, true);
-				builder.getSymTable()->insert(name, initValue, {}, initValue, true);
+				builder.getSymTable()->insert(name, initValue, {}, initValue, true, SymTableEntry::GLOBAL);
 			}
 			else
 			{
 				auto *allocaInst = builder.createAllocaInst(type, {}, name);
 				auto *storeInst = builder.createStoreInst(initValue, allocaInst,{},name);
-				builder.getSymTable()->insert(name, initValue, {}, initValue, true);
+				builder.getSymTable()->insert(name, initValue, {}, initValue, true, SymTableEntry::LOCAL);
 			}
 		}
 	}
@@ -412,10 +411,10 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 				if(globalScope)
 				{
 					auto *globalValue = module->createGlobalValue(name, Type::getPointerType(type), dims, initValue, false);
-					builder.getSymTable()->insert(name, globalValue, dims, initValue, false);
+					builder.getSymTable()->insert(name, globalValue, dims, initValue, false, SymTableEntry::GLOBAL);
 				} else {
 					auto *allocaInst = builder.createAllocaInst(type, dims, name);
-					builder.getSymTable()->insert(name, allocaInst, dims, initValue, false);
+					builder.getSymTable()->insert(name, allocaInst, dims, initValue, false, SymTableEntry::LOCAL);
 					// 待补充：store数组
 					storeLocalArray(allocaInst, initValue);
 				}
@@ -424,10 +423,10 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 			{
 				if(globalScope) {
 					auto *globalValue = module->createGlobalValue(name, Type::getPointerType(type), dims, nullptr, false);
-					builder.getSymTable()->insert(name, globalValue, dims, {}, false);
+					builder.getSymTable()->insert(name, globalValue, dims, {}, false, SymTableEntry::GLOBAL);
 				} else {	
 					auto *allocaInst = builder.createAllocaInst(type, dims, name);
-					builder.getSymTable()->insert(name, allocaInst, dims, nullptr, false);
+					builder.getSymTable()->insert(name, allocaInst, dims, nullptr, false, SymTableEntry::LOCAL);
 				}
 			}
 		}
@@ -438,10 +437,10 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 				auto *initValue = any_cast<Value *>(visitInitVal(vardef->initVal(), iDims, 0));
 				if(globalScope) {
 					auto *globalValue = module->createGlobalValue(name, Type::getPointerType(type), {}, initValue, false);
-					builder.getSymTable()->insert(name, globalValue, {}, initValue, false);
+					builder.getSymTable()->insert(name, globalValue, {}, initValue, false, SymTableEntry::GLOBAL);
 				} else {
 					auto *allocaInst = builder.createAllocaInst(type, {}, name);
-					builder.getSymTable()->insert(name, allocaInst, dims, initValue, false);
+					builder.getSymTable()->insert(name, allocaInst, dims, initValue, false, SymTableEntry::LOCAL);
 					auto *storeInst = builder.createStoreInst(initValue, allocaInst,{},name);
 				}
 			}
@@ -452,17 +451,17 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 					{
 						auto *initValue = ConstantValue::get(0, "0");
 						auto *globalValue = module->createGlobalValue(name, Type::getPointerType(type), {}, nullptr, false);
-						builder.getSymTable()->insert(name, globalValue, {}, nullptr, false);
+						builder.getSymTable()->insert(name, globalValue, {}, nullptr, false, SymTableEntry::GLOBAL);
 					}
 					else if(type->isFloat())
 					{
 						auto *initValue = ConstantValue::get(0.0f, "0.0");
 						auto *globalValue = module->createGlobalValue(name, Type::getPointerType(type), {}, nullptr, false);
-						builder.getSymTable()->insert(name, globalValue, {}, nullptr, false);
+						builder.getSymTable()->insert(name, globalValue, {}, nullptr, false, SymTableEntry::GLOBAL);
 					}
 				} else {
 					auto *allocaInst = builder.createAllocaInst(type, {}, name);
-					builder.getSymTable()->insert(name, allocaInst, {}, nullptr, false);
+					builder.getSymTable()->insert(name, allocaInst, {}, nullptr, false, SymTableEntry::LOCAL);
 				}
 			}
 		}
@@ -786,7 +785,7 @@ any SysYIRGenerator::visitFuncDef(SysYParser::FuncDefContext *ctx) {
 	builder.setPosition(entry, entry->end());
 	for (size_t i = 0; i < paramTypes.size(); ++i) {
 		auto *argument = entry->createArgument(paramTypes[i], paramDims[i], paramNames[i]);
-		function->getSymTable()->insert(paramNames[i], argument, paramDims[i], nullptr, false);
+		function->getSymTable()->insert(paramNames[i], argument, paramDims[i], nullptr, false, SymTableEntry::ARGUMENT);
 	}
 	visitBlock(ctx->block());
 
@@ -970,22 +969,32 @@ any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx) {
 				int boundary = dynamic_cast<ConstantValue *>(dims[i])->getInt();
 				offset = offset * boundary + index;
 			}
+			offset = offset * 4;
 			if (entry->isConstant()){
 				InitList *initList = dynamic_cast<InitList *>(entry->getInitValue());
 				return make_pair((Value *)nullptr, initList->getElement(offset));
 			} else {
-				Value *address = builder.createPAddInst(entry->getValue(), ConstantValue::get(offset, to_string(offset)), newTemp());
+				Value *address = entry->getValue();
+				if (entry->isArgument()) {
+					address = builder.createLoadInst(address, {}, newTemp());
+				}
+				address = builder.createPAddInst(address, ConstantValue::get(offset, to_string(offset)), newTemp());
 				return make_pair(address, (Value *)nullptr);
 			}
 		} else {
 			// varieble indices
 			Value *address = entry->getValue();
-
+			Value *offset = ConstantValue::get(0, "0");
+			if (entry->isArgument()) {
+				address = builder.createLoadInst(address, {}, newTemp());
+			}
 			for (size_t i = 0; i < dims.size(); ++i) {
 				auto *boundary = dynamic_cast<ConstantValue *>(dims[i]);
-				address = builder.createPMulInst(address, boundary, newTemp());
-				address = builder.createPAddInst(address, indices[i], newTemp());
+				offset = builder.createPMulInst(offset, boundary, newTemp());
+				offset = builder.createPAddInst(offset, indices[i], newTemp());
 			}
+			offset = builder.createMulInst(offset, ConstantValue::get(4, "4"), newTemp());
+			address = builder.createAddInst(address, offset, newTemp());
 			return make_pair(address, (Value *)nullptr);
 		}
 	} else {

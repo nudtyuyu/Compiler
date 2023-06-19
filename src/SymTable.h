@@ -10,29 +10,13 @@ namespace sysy {
 class Value;
 class InitList;
 
-class SymTable {
+class SymTable;
+class SymTableEntry;
+
+
+class SymTableEntry {
 public:
-    class Entry;
-
-private:
-    SymTable *parent;
-    std::map<std::string, Entry *> entries;
-
-public:
-    SymTable() = delete;
-    SymTable(SymTable *_parent):parent(_parent), entries() {}
-
-public:
-    Entry *insert(const std::string &name, Value *value, const std::vector<Value *> &dims, Value *initValue, bool constant);
-    Entry *query(const std::string &name);
-
-public:
-    const auto &getEntries() const {
-        return entries;
-    }
-};
-
-class SymTable::Entry {
+    enum Kind {GLOBAL, LOCAL, ARGUMENT};
 private:
     Value *value;       // 数组存首地址；基本类型变量存地址；基本类型常量存值。
     std::vector<Value *> dims;
@@ -40,11 +24,12 @@ private:
     bool constant;
     int addr_offset;    // 汇编中的地址。全局变量为绝对地址，局部变量为相对(fp)地址。考虑到已分配的不会是0，用0表示未分配。
     std::vector<int> InReg; // This var is in which Regs
+    Kind kind;
 
 public:
-    Entry() = delete;
-    Entry(Value *_value, const std::vector<Value *> &_dims, Value *_initValue, bool _constant)
-        :value(_value), dims(_dims), initValue(_initValue), constant(_constant), addr_offset(0) {InReg.clear();}
+    SymTableEntry() = delete;
+    SymTableEntry(Value *_value, const std::vector<Value *> &_dims, Value *_initValue, bool _constant, Kind _kind)
+        :value(_value), dims(_dims), initValue(_initValue), constant(_constant), addr_offset(0), kind(_kind) {InReg.clear();}
 
 public:
     Value *getValue() const {
@@ -88,6 +73,34 @@ public:
     		return true;
     	else
     		return false;
+    }
+    bool isGlobal() const {
+        return (kind == GLOBAL);
+    }
+    bool isArgument() const {
+        return (kind == ARGUMENT);
+    }
+    bool isLocal() const {
+        return (kind == LOCAL);
+    }
+};
+
+class SymTable {
+private:
+    SymTable *parent;
+    std::map<std::string, SymTableEntry *> entries;
+
+public:
+    SymTable() = delete;
+    SymTable(SymTable *_parent):parent(_parent), entries() {}
+
+public:
+    SymTableEntry *insert(const std::string &name, Value *value, const std::vector<Value *> &dims, Value *initValue, bool constant, SymTableEntry::Kind kind);
+    SymTableEntry *query(const std::string &name);
+
+public:
+    const auto &getEntries() const {
+        return entries;
     }
 };
 

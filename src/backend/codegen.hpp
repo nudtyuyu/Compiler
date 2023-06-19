@@ -81,6 +81,10 @@ namespace backend {
         return space + name + " " + dstReg + ", " + \
                         srcReg0 + ", " + srcReg1 + endl;
     }
+
+    class CodeGen;
+    class RegManager;
+
     //
     class RegManager{  
     public:
@@ -110,29 +114,22 @@ namespace backend {
             if(reg == RANY) return "RANY";
             return "r" + to_string(reg);
         }
-        class AValueTable {
-            private:
-            // enum Kind {global, local, temp, arg};
-            struct Entry {
-                RegId reg;
-                int mem;
-                // Kind kind;
-            };
-            std::map<Value *, Entry *> table;
-
-            public:
-            RegId getReg(Value *value) const;
-            int getMem(Value *value) const;
-            void setReg(Value *value, RegId reg);
-            void setMem(Value *value, int mem);
-        };
     private:
         static constexpr const RegId UserRegs[] = {R0, R1, R2, R3, R4, R5, R6, R7, R8, R10, R12};
+        CodeGen *parent;
     	std::map<RegId,std::vector<std::string> > RVALUE;
-        AValueTable aTable;
+        struct Entry {
+            RegId reg;
+            int mem;
+            enum {ABSOLUTE, RELATIVE} kind;
+
+            Entry() : reg(RNONE), mem(0), kind(ABSOLUTE) {};
+        };
+        std::map<Value *, Entry *> AVALUE;
+
     public:
 
-    	RegManager()
+    	RegManager(CodeGen *_parent):parent(_parent)
     	{
     		for(int i=0;i<16;i++)
     		{
@@ -244,7 +241,13 @@ namespace backend {
     		else
     			return false;
     	}
-    	std::vector<RegId> query(const std::vector<Value *> &values = {}); // 指令请求使用value, 返回包含该值的寄存器，如果没有就分配
+    	std::pair<std::string, std::vector<RegId>> query(const std::vector<Value *> &values = {}); // 指令请求使用value, 返回包含该值的寄存器，如果没有就分配
+        RegId getReg(Value *value) const;
+        int getAddress(Value *value) const;
+        int getOffset(Value *value) const;
+        void setReg(Value *value, RegId reg);
+        void setAddress(Value *value, int address);
+        void setOffset(Value *value, int offset);
     };
 
     class Operand{
@@ -296,11 +299,15 @@ namespace backend {
         uint64_t label_no = 0;
         size_t fpOffset = -8;
 
+    public:
+        // cur sp offset
+        int spOffset;
+
         
 
     public:
     	//TODO: add the builder to the CodeGen!!!!
-        CodeGen(Module *module) : module(module) {}
+        CodeGen(Module *module) : module(module), regm(this) {}
         //code_gen function list
         string code_gen();
         string module_gen(Module *module);
@@ -318,7 +325,7 @@ namespace backend {
         }
         //instruction gen function list
         //<dstReg, code>
-        pair<RegId, string> loadInst_gen(LoadInst  *ldInst, RegId dstRegId);
+        string loadInst_gen(LoadInst  *ldInst);
         string               storeInst_gen(StoreInst  *stInst);
         pair<RegId, string> allocaInst_gen(AllocaInst *aInst, RegId dstRegId);
         string               returnInst_gen(ReturnInst *retInst); 

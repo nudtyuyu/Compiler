@@ -2,8 +2,8 @@
 
 namespace sysy {
 
-SymTable::Entry *SymTable::insert(const std::string &name, Value *value, const std::vector<Value *> &dims, Value *initValue, bool constant) {
-    Entry *entry = new Entry(value, dims, initValue, constant);
+SymTableEntry *SymTable::insert(const std::string &name, Value *value, const std::vector<Value *> &dims, Value *initValue, bool constant, SymTableEntry::Kind kind) {
+    SymTableEntry *entry = new SymTableEntry(value, dims, initValue, constant, kind);
     if (entries.find(name) != entries.end()) {
         return nullptr;
     } else {
@@ -13,7 +13,7 @@ SymTable::Entry *SymTable::insert(const std::string &name, Value *value, const s
     }
 }
 
-SymTable::Entry *SymTable::query(const std::string &name) {
+SymTableEntry *SymTable::query(const std::string &name) {
     SymTable *pTable = this;
     while (pTable != nullptr) {
         if (pTable->entries.find(name) != pTable->entries.end())
