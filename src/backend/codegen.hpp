@@ -86,7 +86,8 @@ namespace backend {
     class RegManager;
 
     //
-    class RegManager{  
+    class RegManager{
+    	friend class CodeGen;  
     public:
         //{0,1,2,3,4,5,6,7,8,9,10};
         enum RegId : unsigned {
@@ -121,7 +122,7 @@ namespace backend {
         struct Entry {
             RegId reg;
             int mem;
-            enum {ABSOLUTE, RELATIVE} kind;
+            enum Kind {ABSOLUTE, RELATIVE} kind;
 
             Entry() : reg(RNONE), mem(0), kind(ABSOLUTE) {};
         };
