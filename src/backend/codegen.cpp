@@ -324,15 +324,11 @@ namespace backend{
     pair<RegId, string> 
     CodeGen::allocaInst_gen(AllocaInst *aInst, RegManager::RegId dstRegId){
         string code;
-<<<<<<< Updated upstream
-        return std::make_pair(dstRegId, code);
-        
-=======
         /** 
          *code in here
         */
-        //return std::make_pair(dstRegId, code);
->>>>>>> Stashed changes
+        return std::make_pair(dstRegId, code);
+        
         dstRegId = regm.AssignReg(1)[0];
         if(!regm.IsEmpty(dstRegId))
         {
@@ -341,17 +337,10 @@ namespace backend{
         	{
         		auto var = Rvalue[j];
         		//TODO find the addr in AVALUE(var)
-<<<<<<< Updated upstream
-        		// auto varp = curBB->getSymTable()->query(var);
-        		//auto offset = varp->getOffset();
-        		auto offset = regm.getOffset(var);
-        		code += space + "str    " + regm.toString(dstRegId) + ", [fp, #" + to_string(offset) +"]"  + endl;
-=======
         		//auto varp = curBB->getSymTable()->query(var);
         		//auto offset = varp->getOffset();
         		auto offset = regm.getOffset(var);
         		code += space + "str    " + regm.toString(dstRegId) + ", " ", [fp, #" + to_string(offset) +"]"  + endl;
->>>>>>> Stashed changes
         		
         	}
         	regm.clearRVALUE(dstRegId);
@@ -359,12 +348,7 @@ namespace backend{
         
         // TODO get The Value or do nothing
         auto varName = aInst->getName();
-<<<<<<< Updated upstream
-        // regm.insertRVALUE(dstRegId, varName);
-        regm.insertRVALUE(dstRegId, aInst);
-=======
         
->>>>>>> Stashed changes
         auto Sym = curBB->getSymTable()->query(varName);
         //std::cout<<"Crazy???"<<endl;
         if(Sym->getDims().size()==0)
@@ -1001,10 +985,7 @@ namespace backend{
                 }
             }
             setReg(value, reg);
-<<<<<<< Updated upstream
             clearRVALUE(reg);
-=======
->>>>>>> Stashed changes
             insertRVALUE(reg, value);
             regs.push_back(reg);
         }

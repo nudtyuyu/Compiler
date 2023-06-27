@@ -118,12 +118,7 @@ namespace backend {
     private:
         static constexpr const RegId UserRegs[] = {R0, R1, R2, R3, R4, R5, R6, R7, R8, R10, R12};
         CodeGen *parent;
-<<<<<<< Updated upstream
-    	// std::map<RegId,std::vector<std::string> > RVALUE;
-    	std::map<RegId, std::vector<Value *> > RVALUE;
-=======
     	std::map<RegId,std::vector<Value*> > RVALUE;
->>>>>>> Stashed changes
         struct Entry {
             RegId reg;
             int mem;
@@ -141,13 +136,8 @@ namespace backend {
     	{
     		for(int i=0;i<16;i++)
     		{
-<<<<<<< Updated upstream
     			// std::vector<std::string> rval;
     			RVALUE[RegId(i)] = std::vector<Value *>();
-=======
-    			std::vector<Value*> rval;
-    			RVALUE[RegId(i)]=rval;
->>>>>>> Stashed changes
     		}
     	}
     
@@ -233,15 +223,7 @@ namespace backend {
     		}
     		return RegList;
     	}
-<<<<<<< Updated upstream
-    	// std::vector<std::string> getRVALUE(RegId reg)
-    	// {
-    	// 	return RVALUE[reg];
-    	// }
-    	std::vector<Value *> getRVALUE(RegId reg)
-=======
     	std::vector<Value*> getRVALUE(RegId reg)
->>>>>>> Stashed changes
     	{
     		return RVALUE[reg];
     	}
@@ -249,15 +231,7 @@ namespace backend {
     	{
     		RVALUE[reg].clear();
     	}
-<<<<<<< Updated upstream
-    	// void insertRVALUE(RegId reg, std::string var)
-    	// {
-    	// 	RVALUE[reg].push_back(var);
-    	// }
-    	void insertRVALUE(RegId reg, Value *val)
-=======
-    	void insertRVALUE(RegId reg, Value* var)
->>>>>>> Stashed changes
+    	void insertRVALUE(RegId reg, Value* val)
     	{
     		RVALUE[reg].push_back(val);
     	}
