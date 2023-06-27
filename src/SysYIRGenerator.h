@@ -133,7 +133,7 @@ public:
         static std::stringstream ss;
         static int tmpCount = 0;
         ss.str("");
-        ss << "T" << (tmpCount++);
+        ss << "%" << (tmpCount++);
         return ss.str();
     }
 

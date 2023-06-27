@@ -118,7 +118,8 @@ namespace backend {
     private:
         static constexpr const RegId UserRegs[] = {R0, R1, R2, R3, R4, R5, R6, R7, R8, R10, R12};
         CodeGen *parent;
-    	std::map<RegId,std::vector<std::string> > RVALUE;
+    	// std::map<RegId,std::vector<std::string> > RVALUE;
+    	std::map<RegId, std::vector<Value *> > RVALUE;
         struct Entry {
             RegId reg;
             int mem;
@@ -128,14 +129,16 @@ namespace backend {
         };
         std::map<Value *, Entry *> AVALUE;
 
+        std::string storeBack(Value *value);
+
     public:
 
     	RegManager(CodeGen *_parent):parent(_parent)
     	{
     		for(int i=0;i<16;i++)
     		{
-    			std::vector<std::string> rval;
-    			RVALUE[RegId(i)]=rval;
+    			// std::vector<std::string> rval;
+    			RVALUE[RegId(i)] = std::vector<Value *>();
     		}
     	}
     
@@ -221,7 +224,11 @@ namespace backend {
     		}
     		return RegList;
     	}
-    	std::vector<std::string> getRVALUE(RegId reg)
+    	// std::vector<std::string> getRVALUE(RegId reg)
+    	// {
+    	// 	return RVALUE[reg];
+    	// }
+    	std::vector<Value *> getRVALUE(RegId reg)
     	{
     		return RVALUE[reg];
     	}
@@ -229,9 +236,13 @@ namespace backend {
     	{
     		RVALUE[reg].clear();
     	}
-    	void insertRVALUE(RegId reg, std::string var)
+    	// void insertRVALUE(RegId reg, std::string var)
+    	// {
+    	// 	RVALUE[reg].push_back(var);
+    	// }
+    	void insertRVALUE(RegId reg, Value *val)
     	{
-    		RVALUE[reg].push_back(var);
+    		RVALUE[reg].push_back(val);
     	}
     	bool IsEmpty(RegId reg)
     	{
@@ -242,7 +253,7 @@ namespace backend {
     		else
     			return false;
     	}
-    	std::pair<std::string, std::vector<RegId>> query(const std::vector<Value *> &values = {}); // 指令请求使用value, 返回包含该值的寄存器，如果没有就分配
+    	std::pair<std::string, std::vector<RegId>> query(Value *dstVal, const std::vector<Value *> &srcVal = {}); // 指令请求使用value, 返回包含该值的寄存器，如果没有就分配
         RegId getReg(Value *value) const;
         int getAddress(Value *value) const;
         int getOffset(Value *value) const;
@@ -291,14 +302,14 @@ namespace backend {
         vector<BasicBlock *> linear_bb;
         int bb_no = 0;
         //function params, return value and localVar
-        map<Argument *, int> paramsStOffset;
-        map<Instruction *, int> localVarStOffset;
+        // map<Argument *, int> paramsStOffset;
+        // map<Instruction *, int> localVarStOffset;
         int retValueStOffset = 0;
         size_t stOffsetAcc = 0;
         //label manager
         map<BasicBlock *, string> bb_labels;
         uint64_t label_no = 0;
-        size_t fpOffset = -8;
+        // size_t fpOffset = -8;
 
     public:
         // cur sp offset
@@ -346,10 +357,14 @@ namespace backend {
         }
         //function
         void clearFunctionRecord(Function *func){
-            localVarStOffset.clear();
-            paramsStOffset.clear();
+            // localVarStOffset.clear();
+            // paramsStOffset.clear();
             retValueStOffset = 0;
             bb_labels.clear();
+            regm.AVALUE.clear();
+            for (auto reg : RegManager::UserRegs) {
+                regm.clearRVALUE(reg);
+            }
             //
             stOffsetAcc = 0;
         }

@@ -1,4 +1,5 @@
 #include "codegen.hpp"
+#include <cstddef>
 #include <cstdlib>
 #include <memory>
 #include <string>
@@ -84,7 +85,6 @@ namespace backend{
    string CodeGen::prologueCode_gen(Function *func){
         string code;
         spOffset = 0;
-        fpOffset = -8;
         auto arguments = func->getEntryBlock()->getArguments();
         static std::set<SymTable *> symTables;
         symTables.clear();
@@ -98,16 +98,22 @@ namespace backend{
 
         // arguments & local variebles
         for (size_t i = 0; i < arguments.size(); ++i) {
-        	auto pointer = func->getSymTable()->query(arguments[i]->getName());
+        	auto entry = func->getSymTable()->query(arguments[i]->getName());
             if (i < 4) {
                 spOffset -= 4;
-                code += space + "str    " + regm.toString(RegId(i)) + ", [fp, #" + to_string(spOffset) + "] @ " + arguments[i]->getName() + "\n";
+                code += space + "push   {" + regm.toString(RegId(i)) + "} @ " + arguments[i]->getName() + "(" + to_string(spOffset) + ")" + endl;
+                spOffset -= 4;
+                code += space + "mov    r7, sp" + endl;
+                code += space + "push   {r7}" + endl;
                 
-                pointer->setOffset(spOffset);
-                regm.setOffset(pointer->getValue(),spOffset);
+                entry->setOffset(spOffset);
+                regm.setOffset(arguments[i], spOffset);
             } else {
-                pointer->setOffset((i - 3) * 4);
-                regm.setOffset(pointer->getValue(),(i - 3) * 4);
+                code += space + "add    r4, fp, #" + to_string((i - 3) * 4) + endl;
+                spOffset -= 4;
+                code += space + "push   {r4}" + endl;
+                entry->setOffset(spOffset);
+                regm.setOffset(arguments[i], spOffset);
             }
         }
         for (const auto &basicBlock : func->getBasicBlocks()) {
@@ -135,9 +141,12 @@ namespace backend{
                     elemSize = entry->getValue()->getType()->as<PointerType>()->getBaseType()->getSize();
                 }
                 spOffset -= count * elemSize;
-                code += space + "sub    sp, sp, #" + to_string(count * elemSize) + " @ " + name + "\n";
+                code += space + "sub    sp, sp, #" + to_string(count * elemSize) + " @ " + name + "(" + to_string(spOffset) + ")" + endl;
+                spOffset -= 4;
+                code += space + "mov    r7, sp" + endl;
+                code += space + "push   {r7}" + endl;
                 entry->setOffset(spOffset);
-                regm.setOffset(entry->getValue(),spOffset);
+                regm.setOffset(entry->getValue(), spOffset);
             }
         }
 
@@ -162,9 +171,8 @@ namespace backend{
         string code;
         
         // 释放空间(局部变量、函数实参等)
-        RegManager::RegId dstRegId = regm.AssignReg(1)[0];
-        code += space + "sub    " + regm.toString(dstRegId) + ", fp, #28" + endl;
-        code += space + "mov    sp, " + regm.toString(dstRegId) + endl;
+        code += space + "sub    r7, fp, #28" + endl;
+        code += space + "mov    sp, r7" + endl;
         // 此处代码待优化：仅恢复使用过的变量寄存器
         code += space + "pop    {r4, r5, r6, r7, r8, r10}\n";
         code += space + "pop    {fp, lr}\n";
@@ -173,7 +181,6 @@ namespace backend{
     }
 
     string CodeGen::function_gen(Function *func){
-    	//fpOffset = -8;
         curFunc = func;
         clearFunctionRecord(func);
         string code;
@@ -317,10 +324,8 @@ namespace backend{
     pair<RegId, string> 
     CodeGen::allocaInst_gen(AllocaInst *aInst, RegManager::RegId dstRegId){
         string code;
-        /** 
-         *code in here
-        */
         return std::make_pair(dstRegId, code);
+        
         dstRegId = regm.AssignReg(1)[0];
         if(!regm.IsEmpty(dstRegId))
         {
@@ -329,10 +334,10 @@ namespace backend{
         	{
         		auto var = Rvalue[j];
         		//TODO find the addr in AVALUE(var)
-        		auto varp = curBB->getSymTable()->query(var);
+        		// auto varp = curBB->getSymTable()->query(var);
         		//auto offset = varp->getOffset();
-        		auto offset = regm.getOffset(varp->getValue());
-        		code += space + "str    " + regm.toString(dstRegId) + ", " ", [fp, #" + to_string(offset) +"]"  + endl;
+        		auto offset = regm.getOffset(var);
+        		code += space + "str    " + regm.toString(dstRegId) + ", [fp, #" + to_string(offset) +"]"  + endl;
         		
         	}
         	regm.clearRVALUE(dstRegId);
@@ -340,7 +345,8 @@ namespace backend{
         
         // TODO get The Value or do nothing
         auto varName = aInst->getName();
-        regm.insertRVALUE(dstRegId,varName);
+        // regm.insertRVALUE(dstRegId, varName);
+        regm.insertRVALUE(dstRegId, aInst);
         auto Sym = curBB->getSymTable()->query(varName);
         if(Sym->getDims().size()==0)
         {
@@ -375,10 +381,8 @@ namespace backend{
         	else
         	{
         		//auto valueName = value->getName();
-        		std::vector<Value*> values;
         		//value = Sym->getValue();
-        		values.push_back(value);
-        		auto tmp = regm.query(values);
+        		auto tmp = regm.query(aInst, {});
         		auto extraCode = tmp.first;
         		auto Regs = tmp.second;
         		auto srcReg = Regs[0];
@@ -408,23 +412,17 @@ namespace backend{
 
     string CodeGen::storeInst_gen(StoreInst *stInst){
         string code;
-        /** 
-         *code in here
-        */
-        auto varName = stInst->getPointer()->getName();
-        auto var = curBB->getSymTable()->query(varName);
-        auto var1 = stInst->getPointer();
-        auto offset = regm.getOffset(var1);
+        // auto varName = stInst->getPointer()->getName();
+        // auto var = curBB->getSymTable()->query(varName);
+        auto *pointer = stInst->getPointer();
+        auto *value = stInst->getValue();
         //auto offset = var->getOffset();
         //TODO Find srcRegId from AVALUE!!!
-        //std::cout<< space << "var1Value*: " << varName <<space<<var1 << endl;
-        std::vector<Value*> values;
-        values.push_back(stInst->getValue());
-        auto tmp = regm.query(values);
-        auto srcRegId = tmp.second[0];
-        auto extraCode = tmp.first;
-        code += extraCode; 
-        code += space + "str    " + regm.toString(RegManager::RegId(srcRegId)) +  ", [fp, #" + to_string(offset) +"]"  + endl;
+        //std::cout<< space << "var1Value*: " << varName << space << var1 << endl;
+        auto tmp = regm.query(nullptr, {pointer, value});
+        auto regs = tmp.second;
+        code += tmp.first;
+        code += space + "str    " + regm.toString(regs[1]) +  ", [" + regm.toString(regs[0]) +"]"  + endl;
         
         return code;
     }
@@ -432,7 +430,7 @@ namespace backend{
         string code;
         
         Value *operand = ldInst->getOperand(0);
-        auto tmp = regm.query({ldInst, operand});
+        auto tmp = regm.query(ldInst, {operand});
         code += tmp.first;
         auto regs = tmp.second;
         auto dstRegId = regs[0];
@@ -469,7 +467,7 @@ namespace backend{
         // }
         auto returnValue = retInst->getReturnValue();
         auto constVal = dynamic_cast<ConstantValue*>(returnValue);
-        auto tmp = regm.query({returnValue});
+        auto tmp = regm.query(nullptr, {returnValue});
         code += tmp.first;
         auto dstRegId = tmp.second[0];
         if(constVal!=nullptr)
@@ -539,9 +537,41 @@ namespace backend{
     pair<RegId, string> 
     CodeGen::callInst_gen(CallInst *callInst, RegId dstRegId){
         string code;
-        /** 
-         *code in here
-        */
+        // preserve registers
+        code += space + "push   {r0, r1, r2, r3}" + endl;
+
+        // arguments
+        size_t n_args = callInst->getNumOperands() - 1;
+        // 还有问题，有可能query会分配到r0-r3
+        for (size_t i = n_args; i > 0; --i) {
+            auto tmp = regm.query(nullptr, {callInst->getOperand(i)});
+            code += tmp.first;
+            if (i > 4) {
+                code += space + "push   {" + regm.toString(tmp.second[0]) + "}" + endl;
+            } else {
+                code += space + "mov    " + regm.toString(RegId(i - 1)) + ", " + regm.toString(tmp.second[0]) + endl;
+            }
+        }
+
+        // call
+        code += space + "bl     " + callInst->getCallee()->getName() + endl;
+
+        // return value
+        if (!callInst->getCallee()->getReturnType()->isVoid()) {
+            auto tmp = regm.query(callInst, {});
+            code += tmp.first;
+            code += space + "mov    " + regm.toString(tmp.second[0]) + ", r0" + endl;
+        }
+
+        // restore stack
+        if (n_args > 4) {
+            code += space + "add    sp, #" + to_string((n_args - 4) * 4) + endl;
+        }
+
+
+        // restore registers
+        code += space + "pop    {r0, r1, r2, r3}" + endl;
+
         return {dstRegId, code};
     }
 
@@ -791,7 +821,8 @@ namespace backend{
         				asmCode+= space + ".word    " + element->name +endl;
         		}
         	}
-        	
+        	// 临时标记一下全局变量
+            regm.setAddress(gb, 0x10000);
         }
         return asmCode;
     }
@@ -828,6 +859,7 @@ namespace backend{
     }
 
     void RegManager::setReg(Value *value, RegId reg) {
+        // std::cerr << "[debug]<setReg> " + value->getName() + " " + toString(reg) + endl;
         if (AVALUE.find(value) == AVALUE.end()) {
             AVALUE[value] = new Entry();
             AVALUE[value]->kind = Entry::RELATIVE;
@@ -844,54 +876,106 @@ namespace backend{
     }
 
     void RegManager::setOffset(Value *value, int mem) {
+        // std::cerr << "[debug]<setOffset> " + value->getName() + " " + to_string(mem) + endl;
         if (AVALUE.find(value) == AVALUE.end()) {
             AVALUE[value] = new Entry();
         }
         AVALUE[value]->mem = mem;
         AVALUE[value]->kind = Entry::RELATIVE;
     }
-    
-    std::pair<std::string, std::vector<RegId>> RegManager::query(const std::vector<Value *> &values) {
+
+    std::string RegManager::storeBack(Value *value) {
+        std::string code;
+        int addr = getAddress(value);
+        int offset = getOffset(value);
+        RegId reg = getReg(value);
+        if (addr != 0) {
+            // 需要用一个寄存器用来放地址，先用一个不安全的方法
+            RegId rtmp = (reg == R0 ? R1 : R0);
+            code += space + "push   {" + toString(rtmp) + "}" + endl;
+            code += space + "movw   " + toString(rtmp) + ", #:lower16:" + value->getName() + endl;
+            code += space + "movt   " + toString(rtmp) + ", #:upper16:" + value->getName() + endl;
+            code += space + "str    " + toString(reg) + ", " + toString(rtmp) + endl;
+            code += space + "pop    {" + toString(rtmp) + "}" + endl;
+        } else {
+            if (offset == 0) {
+                parent->spOffset -= 4;
+                offset = parent->spOffset;
+                code += space + "sub    sp, #4" + " @ " + value->getName() + "(" + to_string(parent->spOffset) + ")" + endl;
+                setOffset(value, offset);
+            }
+            code += space + "str    " + toString(reg) + ", [fp, #" + to_string(offset) + "]" + endl;
+        }
+
+        return code;
+    }
+
+    std::pair<std::string, std::vector<RegId>> RegManager::query(Value *dstVal, const std::vector<Value *> &srcVal) {
         std::vector<RegId> regs;
         std::string code;
-        for (auto *value : values) {
+
+        if (dstVal != nullptr) {
+            RegId reg = getReg(dstVal);
+            int addr = getAddress(dstVal);
+            int offset = getOffset(dstVal);
+            if (reg == RNONE) {
+                for (auto r : UserRegs) {
+                    if (IsEmpty(r)) {
+                        reg = r;
+                        break;
+                    }
+                }
+                if (reg == RNONE) {
+                    reg = UserRegs[rand() % 11];
+                    Value *oldVal = getRVALUE(reg)[0];
+                    code += storeBack(oldVal);
+                    setReg(oldVal, RNONE);
+                }
+                clearRVALUE(reg);
+                insertRVALUE(reg, dstVal);
+                setReg(dstVal, reg);
+            }
+            regs.push_back(reg);
+        }
+
+        for (auto *value : srcVal) {
             RegId reg = getReg(value);
             int addr = getAddress(value);
             int offset = getOffset(value);
             if (reg == RNONE) {
                 for (auto r : UserRegs) {
                     if (IsEmpty(r)) {
-                        // emit ldr instruction
-                        if (addr != 0) {
-                            // 绝对地址只对全局变量有效，可以用名字
-                            code += space + "ldr    " + toString(r) + ", " + value->getName() + endl;
-                        } else if (offset != 0) {
-                            code += space + "ldr    " + toString(r) + ", [fp, #" + to_string(offset) + "]" + endl;
-                        } else {
-                            code += space + "sub    sp, #4" + " @ " + value->getName() + endl;
-                            parent->spOffset -= 4;
-                            offset = parent->spOffset;
-                            setOffset(value, offset);
-                        }
                         reg = r;
                         break;
                     }
                 }
-            }
-            while (reg == RNONE) {
-                reg = RegId(rand() % 11);
-                for (auto r : regs) {
-                    if (reg == r) {
-                        reg = RNONE;
-                        break;
-                    }
+                if (reg == RNONE) {
+                    do {
+                        reg = UserRegs[rand() % 11];
+                        for (auto r : regs) {
+                            if (reg == r) {
+                                reg = RNONE;
+                                break;
+                            }
+                        }
+                    } while (reg == RNONE);
+                    Value *oldVal = getRVALUE(reg)[0];
+                    code += storeBack(oldVal);
+                    setReg(oldVal, RNONE);
                 }
-                // emit str instructions
-                // setReg(xxxxx, RNONE)
-                // reset RVALUE
+                if (addr != 0) {
+                    // global
+                    code += space + "movw   " + toString(reg) + ", #:lower16:" + value->getName() + endl;
+                    code += space + "movt   " + toString(reg) + ", #:upper16:" + value->getName() + endl;
+                } else if (offset != 0) {
+                    code += space + "ldr    " + toString(reg) + ", [fp, #" + to_string(offset) + "]" + endl;
+                } else {
+                    std::cerr << "source value inaccessible:" << value->getName() << endl;
+                }
             }
             setReg(value, reg);
-            insertRVALUE(reg, value->getName());
+            clearRVALUE(reg);
+            insertRVALUE(reg, value);
             regs.push_back(reg);
         }
 
