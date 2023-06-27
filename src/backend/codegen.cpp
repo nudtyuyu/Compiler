@@ -25,6 +25,7 @@ namespace backend{
         clearModuleRecord(module);
         //generate asmcode for all global values 
         dataCode += globaldata_gen();
+        //regm.ShowAVALUE();
 
         code += space + ".arch armv7 " + endl;
         code += space + ".text " + endl;
@@ -37,6 +38,7 @@ namespace backend{
             auto bblist = func->getBasicBlocks();
             if(bblist.empty()) continue;
             //generate asmcode for each function
+            //regm.ShowAVALUE();
             textCode += function_gen(func) + endl;
             textCode += space + ".size    "+ name + ", " + ".-" + name + endl;
         }
@@ -324,7 +326,7 @@ namespace backend{
     pair<RegId, string> 
     CodeGen::allocaInst_gen(AllocaInst *aInst, RegManager::RegId dstRegId){
         string code;
-        return std::make_pair(dstRegId, code);
+        //return std::make_pair(dstRegId, code);
         
         dstRegId = regm.AssignReg(1)[0];
         if(!regm.IsEmpty(dstRegId))
@@ -377,12 +379,14 @@ namespace backend{
         			sprintf(ObjValue,"%d",*(int*)mynum);
         			code += space + "movt   " + regm.toString(dstRegId) + ", "+ ObjValue +endl;
         		}
+        		regm.setReg(value,dstRegId);
         	}
         	else
         	{
+        		//TODO:Many Problem!!!!
         		//auto valueName = value->getName();
         		//value = Sym->getValue();
-        		auto tmp = regm.query(aInst, {});
+        		auto tmp = regm.query(aInst,{});
         		auto extraCode = tmp.first;
         		auto Regs = tmp.second;
         		auto srcReg = Regs[0];
@@ -391,14 +395,15 @@ namespace backend{
         		//auto offset = val->getOffset();
         		//code += space + "ldr     " + regm.toString(dstRegId) + ", [fp, #" + to_string(offset) +"]" + endl;
         		code += extraCode;
-        		code += space + "mov    " + regm.toString(dstRegId) + ", "+ regm.toString(srcReg) +endl; 
+        		//code += space + "mov    " + regm.toString(dstReg) + ", "+ regm.toString(dstReg) +endl; 
+        		
         		   
         	}
         	//Sym->setOffset(fpOffset);
         	//fpOffset -= 4;
         	//Sym->addReg(dstRegId);
         	//std::cout<< space << "symValue*: " << varName<<space<<Sym->getValue() << endl;
-        	regm.setReg(value,dstRegId);
+        	//regm.setReg(value,dstRegId);
         	//regm.aTable.setReg(Sym->getValue()
         	//auto myreg = regm.aTable.getReg(Sym->getValue());
         	//std::cout<< space << "The reg I set: "<< regm.toString(myreg)<< endl;
@@ -429,7 +434,11 @@ namespace backend{
     string CodeGen::loadInst_gen(LoadInst  *ldInst){
         string code;
         
+        
         Value *operand = ldInst->getOperand(0);
+        //std::cout<<"This is load!"<<endl;
+        //std::cout<<"ldInst: "<<ldInst->getName()<<" "<<ldInst<<endl;
+        //std::cout<<"operand: "<<operand->getName()<<" "<<operand<<endl;
         auto tmp = regm.query(ldInst, {operand});
         code += tmp.first;
         auto regs = tmp.second;
@@ -484,19 +493,20 @@ namespace backend{
         	auto valueName = returnValue->getName();
         	// auto val = curBB->getSymTable()->query(valueName);
         	// auto glbMap = module->getGlobalValues();
+        	//auto Reg = regm.getReg(returnValue);
             auto addr = regm.getAddress(returnValue);
             auto offset = regm.getOffset(returnValue);
         	if(addr != 0)
         	{
+        		//global
         		code += space + "movw   " + regm.toString(dstRegId) + ", "+ "#:lower16:"+ valueName +endl;
         		code += space + "movt   " + regm.toString(dstRegId) + ", "+ "#:upper16:"+ valueName +endl;
         		code += space + "ldr    " + regm.toString(dstRegId) + ", "+ "[" + regm.toString(dstRegId) + "]" +endl;
         	}
         	else
         	{
-        		// auto dims = val->getDims();
-        		// if(dims.size()==0)
-        		// {
+        		
+        		
         			//auto tmp = regm.query(var->getValue());
         			//auto srcRegId = tmp.second;
         			//auto extraCode =
@@ -510,10 +520,11 @@ namespace backend{
         			// else
         			// {
         			// 	//auto offset = val->getOffset();
-        			// 	code += space + "ldr    " + regm.toString(dstRegId) + ", [fp, #" + to_string(offset) +"]" + endl;
+        			//std::cout<<"return: "<<returnValue<<endl;
+        			//code += space + "ldr    " + regm.toString(dstRegId) + ", [fp, #" + to_string(offset) +"]" + endl;
+        			//code += space + "ldr    " + regm.toString(dstRegId) + ", [" + regm.toString(dstRegId) + "]" + endl;
         			// }
         			
-        		// }
         		//TODO: array[offset]
        		}
        	}
@@ -823,6 +834,7 @@ namespace backend{
         	}
         	// 临时标记一下全局变量
             regm.setAddress(gb, 0x10000);
+            //std::cout<<name<<": "<<", "<<gb<<regm.getAddress(gb)<<endl;
         }
         return asmCode;
     }
@@ -842,7 +854,9 @@ namespace backend{
 
     int RegManager::getAddress(Value *value) const {
         auto result = AVALUE.find(value);
+        //std::cout<<"getAddress of "<<value<<endl;
         if (result == AVALUE.end() || result->second->kind == Entry::RELATIVE) {
+        	//std::cout<<(result->second->kind==Entry::RELATIVE)<<endl;
             return 0;
         } else {
             return result->second->mem;
@@ -873,6 +887,17 @@ namespace backend{
         }
         AVALUE[value]->mem = mem;
         AVALUE[value]->kind = Entry::ABSOLUTE;
+        
+    }
+    
+    void RegManager::ShowAVALUE()
+    {
+    	std::cout<<"#######################"<<endl;
+    	for(auto iter = AVALUE.begin();iter!=AVALUE.end();iter++)
+    	{
+    		std::cout<<(iter->first)<<" "<<(iter->second->mem)<<endl;
+    	}
+    	std::cout<<"#######################"<<endl;
     }
 
     void RegManager::setOffset(Value *value, int mem) {
@@ -913,11 +938,13 @@ namespace backend{
     std::pair<std::string, std::vector<RegId>> RegManager::query(Value *dstVal, const std::vector<Value *> &srcVal) {
         std::vector<RegId> regs;
         std::string code;
-
+		//ShowAVALUE();
         if (dstVal != nullptr) {
             RegId reg = getReg(dstVal);
             int addr = getAddress(dstVal);
             int offset = getOffset(dstVal);
+            //std::cout<<dstVal->getName()<<", "<<dstVal<<": "<<reg<<endl;
+            //std::cout<<dstVal->getName()<<", "<<dstVal<<": "<<addr<<endl;
             if (reg == RNONE) {
                 for (auto r : UserRegs) {
                     if (IsEmpty(r)) {
@@ -942,6 +969,10 @@ namespace backend{
             RegId reg = getReg(value);
             int addr = getAddress(value);
             int offset = getOffset(value);
+            //std::cout<<"Has srcVal!"<<endl;
+            //std::cout<<value->getName()<<", "<<value<<": "<<reg<<endl;
+            //std::cout<<value->getName()<<", "<<value<<": "<<addr<<endl;
+            //std::cout<<value->getName()<<", "<<value<<": "<<offset<<endl;
             if (reg == RNONE) {
                 for (auto r : UserRegs) {
                     if (IsEmpty(r)) {
@@ -965,6 +996,7 @@ namespace backend{
                 }
                 if (addr != 0) {
                     // global
+                    //std::cout<<"add some code!"<<endl;
                     code += space + "movw   " + toString(reg) + ", #:lower16:" + value->getName() + endl;
                     code += space + "movt   " + toString(reg) + ", #:upper16:" + value->getName() + endl;
                 } else if (offset != 0) {
