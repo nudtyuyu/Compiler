@@ -538,9 +538,8 @@ namespace backend {
     }
     string CodeGen::uncondBrInst_gen(UncondBrInst *ubInst){
         string code;
-        /** 
-         *code in here
-        */
+        string bbname = ubInst->getBlock()->getName();
+        code += space + "b      " + bbname + endl;
         return code;
     }
     string CodeGen::condBrInst_gen(CondBrInst *cbInst){

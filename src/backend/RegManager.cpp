@@ -141,21 +141,28 @@ std::string RegManager::storeBack(Value *value) {
     int addr = getAddress(value);
     int offset = getOffset(value);
     RegId reg = getReg(value);
-    if (addr != 0) {
-        // 需要用一个寄存器用来放地址，先用一个不安全的方法
-        RegId rtmp = (reg == R0 ? R1 : R0);
-        code += space + "push   {" + toString(rtmp) + "}" + endl;
-        code += space + "movw   " + toString(rtmp) + ", #:lower16:" + value->getName() + endl;
-        code += space + "movt   " + toString(rtmp) + ", #:upper16:" + value->getName() + endl;
-        code += space + "str    " + toString(reg) + ", " + toString(rtmp) + endl;
-        code += space + "pop    {" + toString(rtmp) + "}" + endl;
-    } else {
-        if (offset == 0) {
-            *spOffset -= 4;
-            offset = *spOffset;
-            code += space + "sub    sp, #4" + " @ " + value->getName() + "(" + to_string(offset) + ")" + endl;
-            setOffset(value, offset);
-        }
+    // if (addr != 0) {
+    //     // 需要用一个寄存器用来放地址，先用一个不安全的方法
+    //     RegId rtmp = (reg == R0 ? R1 : R0);
+    //     code += space + "push   {" + toString(rtmp) + "}" + endl;
+    //     code += space + "movw   " + toString(rtmp) + ", #:lower16:" + value->getName() + endl;
+    //     code += space + "movt   " + toString(rtmp) + ", #:upper16:" + value->getName() + endl;
+    //     code += space + "str    " + toString(reg) + ", " + toString(rtmp) + endl;
+    //     code += space + "pop    {" + toString(rtmp) + "}" + endl;
+    // } else {
+    //     if (offset == 0) {
+    //         *spOffset -= 4;
+    //         offset = *spOffset;
+    //         code += space + "sub    sp, #4" + " @ " + value->getName() + "(" + to_string(offset) + ")" + endl;
+    //         setOffset(value, offset);
+    //     }
+    //     code += space + "str    " + toString(reg) + ", [fp, #" + to_string(offset) + "]" + endl;
+    // }
+    if (addr == 0 && offset == 0) {
+        *spOffset -= 4;
+        offset = *spOffset;
+        code += space + "sub    sp, #4" + " @ " + value->getName() + "(" + to_string(offset) + ")" + endl;
+        setOffset(value, offset);
         code += space + "str    " + toString(reg) + ", [fp, #" + to_string(offset) + "]" + endl;
     }
 
