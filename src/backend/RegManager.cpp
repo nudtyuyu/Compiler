@@ -1,4 +1,6 @@
 #include "RegManager.h"
+#include <cstdint>
+#include <string>
 
 using std::cerr;
 const string space = string(4, ' ');
@@ -7,6 +9,14 @@ const string endl = "\n";
 namespace backend {
 
 using RegId = RegManager::RegId;
+    
+static uint16_t getWordHigh(uint32_t cval){
+    return (cval >> 16) & 0xFFFF;
+}
+
+static uint16_t getWordLow(uint32_t cval){
+    return cval & 0xFFFF;
+}
 
 RegManager::RegManager(int *_spOffset) : spOffset(_spOffset) {
     for (int i = 0; i < 16; i++) {
@@ -229,7 +239,26 @@ std::pair<std::string, std::vector<RegId>> RegManager::query(Value *dstVal, cons
             } else if (offset != 0) {
                 code += space + "ldr    " + toString(reg) + ", [fp, #" + to_string(offset) + "]" + endl;
             } else {
-                cerr << "source value inaccessible:" << value->getName() << endl;
+                auto constv = dynamic_cast<sysy::ConstantValue*>(value);
+                if (constv != nullptr) {
+                    if (constv->getType()->isFloat()) {
+                        float number = constv->getFloat();
+                        uint16_t highBits = getWordHigh(*(uint32_t *)&number);
+                        uint16_t lowBits = getWordLow(*(uint32_t *)&number);
+                        code += space + "movw   " + toString(reg) + ", #" + to_string(lowBits) + endl;
+                        code += space + "movt   " + toString(reg) + ", #" + to_string(highBits) + endl;
+                    } else if (constv->getType()->isInt()) {
+                        int number = constv->getInt();
+                        uint16_t highBits = getWordHigh(*(uint32_t *)&number);
+                        uint16_t lowBits = getWordLow(*(uint32_t *)&number);
+                        code += space + "movw   " + toString(reg) + ", #" + to_string(lowBits) + endl;
+                        code += space + "movt   " + toString(reg) + ", #" + to_string(highBits) + endl;
+                    } else {
+                        cerr << "Constant value inaccessible:" << value->getName() << endl;
+                    }
+                } else {
+                    cerr << "Source value inaccessible:" << value->getName() << endl;
+                }
             }
         }
         setReg(value, reg);

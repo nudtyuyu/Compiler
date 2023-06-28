@@ -68,14 +68,6 @@ namespace backend {
     //default arm32 max imm
     static const uint32_t maxMovImm = 0xFFF;
     static  const string stackIndexReg = "fp";
-    
-    static uint16_t getWordHigh(uint32_t cval){
-        return (cval >> 16) & 0xFFFF;
-    }
-    static uint16_t getWordLow(uint32_t cval){
-        return cval & 0xFFFF;
-    }
-
     // class Operand{
     // public:
     //     using RegId = RegManager::RegId;
