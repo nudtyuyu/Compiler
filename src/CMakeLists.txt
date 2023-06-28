@@ -18,7 +18,8 @@ add_executable(sysyc
   SysYIRGenerator.cpp
   Diagnostic.cpp
   SymTable.cpp
-  backend/codegen.cpp
+  backend/CodeGen.cpp
+  backend/RegManager.cpp
 )
 target_include_directories(sysyc PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(sysyc PRIVATE "backend")

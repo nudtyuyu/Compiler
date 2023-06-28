@@ -8,7 +8,7 @@ using namespace std;
 using namespace antlr4;
 // #include "SysYFormatter.h"
 #include "SysYIRGenerator.h"
-#include "backend/codegen.hpp"
+#include "backend/CodeGen.h"
 using namespace sysy;
 using backend::CodeGen;
 
