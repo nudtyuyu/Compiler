@@ -108,13 +108,13 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 			//builder.getSymTable()->insert(name, initValue, {}, initValue, true);
 			if(globalScope) {
 				auto *globalValue = module->createGlobalValue(name, type, {}, initValue, true);
-				builder.getSymTable()->insert(name, initValue, {}, initValue, true, SymTableEntry::GLOBAL);
+				builder.getSymTable()->insert(name, globalValue, {}, initValue, true, SymTableEntry::GLOBAL);
 			}
 			else
 			{
 				auto *allocaInst = builder.createAllocaInst(type, {}, name);
 				auto *storeInst = builder.createStoreInst(initValue, allocaInst,{},name);
-				builder.getSymTable()->insert(name, initValue, {}, initValue, true, SymTableEntry::LOCAL);
+				builder.getSymTable()->insert(name, allocaInst, {}, initValue, true, SymTableEntry::LOCAL);
 			}
 		}
 	}

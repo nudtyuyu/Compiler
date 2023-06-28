@@ -251,6 +251,7 @@ namespace backend {
         void setReg(Value *value, RegId reg);
         void setAddress(Value *value, int address);
         void setOffset(Value *value, int offset);
+        void ShowAVALUE();
     };
 
     class Operand{
@@ -352,7 +353,18 @@ namespace backend {
             // paramsStOffset.clear();
             retValueStOffset = 0;
             bb_labels.clear();
-            regm.AVALUE.clear();
+            for(auto iter=regm.AVALUE.begin();iter!=regm.AVALUE.end();)
+            {
+            	if(iter->second->kind != RegManager::Entry::ABSOLUTE)
+            	{
+            		regm.AVALUE.erase(iter++);
+            	}
+            	else
+            	{
+            		++iter;
+            	}
+            }
+            
             for (auto reg : RegManager::UserRegs) {
                 regm.clearRVALUE(reg);
             }
