@@ -85,9 +85,33 @@ any SysYIRGenerator::visitConstDecl(SysYParser::ConstDeclContext *ctx)
 			for(auto *constexp:constdef->constExp())
 			{
 				auto *dim = any_cast<Value*>(visitConstExp(constexp));
+				int index;
 				assert(dim->isInt());
+				
+				auto constDim = dynamic_cast<ConstantValue *>(dim);
+				if(constDim!=nullptr)
+				{
+					index = constDim->getInt();
+				}
+				else
+				{
+					auto DimPointer = builder.getSymTable()->query(dim->getName());
+					if(DimPointer==nullptr)
+					{
+						cout<<dim->getName()<<" is undefined!"<<endl;
+						exit(0);
+					}
+					dim = DimPointer->getInitValue();
+					if(DimPointer->isConstant())
+						index = dynamic_cast<ConstantValue*>(DimPointer->getInitValue())->getInt();
+				        else
+				        {
+				        	cout<<"The Index of Array must be constant!"<<endl;
+				        	exit(0);
+				        }
+				}
+				iDims.push_back(index);
 				dims.push_back(dim);
-				iDims.push_back(dynamic_cast<ConstantValue *>(dim)->getInt());
 			}
 			nowElement = 0;
 			auto *initValue = std::any_cast<Value *>(visitConstInitVal(constdef->constInitVal(), iDims, 0));
@@ -401,8 +425,33 @@ any SysYIRGenerator::visitVarDecl(SysYParser::VarDeclContext *ctx)
 			for(auto constexp:vardef->constExp())
 			{
 				auto *dim = any_cast<Value*>(visitConstExp(constexp));
+				int index;
+				assert(dim->isInt());
+				
+				auto constDim = dynamic_cast<ConstantValue *>(dim);
+				if(constDim!=nullptr)
+				{
+					index = constDim->getInt();
+				}
+				else
+				{
+					auto DimPointer = builder.getSymTable()->query(dim->getName());
+					if(DimPointer==nullptr)
+					{
+						cout<<dim->getName()<<" is undefined!"<<endl;
+						exit(0);
+					}
+					dim = DimPointer->getInitValue();
+					if(DimPointer->isConstant())
+						index = dynamic_cast<ConstantValue*>(DimPointer->getInitValue())->getInt();
+				        else
+				        {
+				        	cout<<"The Index of Array must be constant!"<<endl;
+				        	exit(0);
+				        }
+				}
+				iDims.push_back(index);
 				dims.push_back(dim);
-				iDims.push_back(dynamic_cast<ConstantValue *>(dim)->getInt());
 			}
 			if(vardef->Assign())
 			{
@@ -1000,7 +1049,7 @@ any SysYIRGenerator::visitLVal(SysYParser::LValContext *ctx) {
 	} else {
 		// basic type varieble
 		if (entry->isConstant()) {
-			return make_pair((Value *)nullptr, entry->getValue());
+			return make_pair((Value *)nullptr, entry->getInitValue());
 		} else {
 			return make_pair(entry->getValue(), (Value *)nullptr);
 		}
@@ -1131,12 +1180,15 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 			{
 			
 				//create
-				auto name = '+'+term->name;
+				//auto name = '+'+term->name;
 				auto *vp = module->getInteger(term->name);
 				if(vp!=nullptr)
 				{
 					int v = *vp;
+					auto name = to_string(v);
 					module->createInteger(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				auto *unary = builder.createPosInst(term,newTemp());
 				// cout<<"PositiveUnary: wait for edit!"<<endl;
@@ -1145,13 +1197,16 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 			else if(ctx->unaryOp()->Sub())
 			{
 				// Type! Int or Float!
-				auto name = '-'+term->name;
+				//auto name = '-'+term->name;
 				auto *vp = module->getInteger(term->name);
 				if(vp!=nullptr)
 				{
 					int v = *vp;
 					v = -v;
+					auto name = to_string(v);
 					module->createInteger(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				auto *unary = builder.createNegInst(term, newTemp());
 				// cout<<"getunarysub"<<endl;
@@ -1160,13 +1215,16 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 			else if(ctx->unaryOp()->Not())
 			{
 				// Type! Int or Float!
-				auto name = '!'+term->name;
+				//auto name = '!'+term->name;
 				auto *vp = module->getInteger(term->name);
 				if(vp!=nullptr)
 				{
 					int v = *vp;
 					v = !v;
+					auto name = to_string(v);
 					module->createInteger(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				auto *unary = builder.createNotInst(term,newTemp());
 				// cout<<"getunarynot"<<endl;
@@ -1179,12 +1237,15 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 			{
 			
 				//create
-				auto name = '+'+term->name;
+				//auto name = '+'+term->name;
 				auto *vp = module->getFloat(term->name);
 				if(vp!=nullptr)
 				{
 					float v = *vp;
+					auto name = to_string(v);
 					module->createFloat(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				auto *unary = builder.createFPosInst(term,newTemp());
 				// cout<<"PositiveUnary: wait for edit!"<<endl;
@@ -1193,13 +1254,16 @@ any SysYIRGenerator::visitUnaryExp(SysYParser::UnaryExpContext *ctx)
 			else if(ctx->unaryOp()->Sub())
 			{
 				// Type! Int or Float!
-				auto name = '-'+term->name;
+				//auto name = '-'+term->name;
 				auto *vp = module->getFloat(term->name);
 				if(vp!=nullptr)
 				{
 					float v = *vp;
 					v = -v;
+					auto name = to_string(v);
 					module->createFloat(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				auto *unary = builder.createFNegInst(term,newTemp());
 				// cout<<"getunarysub"<<endl;
@@ -1243,13 +1307,16 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 			auto vpM = module->getInteger(nameM);
 			if(ctx->Mul())
 			{
-				auto name = nameM+'*'+nameU;
+				//auto name = newTempNum();
 				if(vpU!=nullptr && vpM !=nullptr)
 				{
 					int u = *vpU;
 					int m = *vpM;
 					int v = u*m;
+					auto name = to_string(v);
 					module->createInteger(name,v);
+					auto result = ConstantValue::get(v,to_string(v));
+					return (Value*)result;
 				}
 				auto mul = builder.createMulInst(multerm,unarrayTableerm,newTemp());
 				// cout<<"getmul"<<endl;
@@ -1257,13 +1324,16 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 			}
 			else if(ctx->Div())
 			{
-				auto name = nameM+'/'+nameU;
+				//auto name = newTempNum();
 				if(vpU!=nullptr && vpM !=nullptr)
 				{
 					int u = *vpU;
 					int m = *vpM;
 					int v = m/u;
+					auto name = to_string(v);
 					module->createInteger(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				auto div = builder.createDivInst(multerm,unarrayTableerm,newTemp());
 				// cout<<"getdiv"<<endl;
@@ -1271,13 +1341,16 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 			}
 			else if(ctx->Mod())
 			{
-				auto name = nameM+'%'+nameU;
+				//auto name = nameM+'%'+nameU;
 				if(vpU!=nullptr && vpM !=nullptr)
 				{
 					int u = *vpU;
 					int m = *vpM;
 					int v = m%u;
+					auto name = to_string(v);
 					module->createInteger(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				auto mod = builder.createRemInst(multerm,unarrayTableerm,newTemp());
 				// cout<<"getmod"<<endl;
@@ -1294,13 +1367,16 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 			multerm = builder.createIToFInst(multerm, newTemp());
 			if(ctx->Mul())
 			{
-				auto name = nameM+'*'+nameU;
+				//auto name = nameM+'*'+nameU;
 				if(vpU!=nullptr && vpM !=nullptr)
 				{
 					float u = *vpU;
 					int m = *vpM;
 					float v = u*m;
+					auto name = to_string(v);
 					module->createFloat(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				auto mul = builder.createFMulInst(multerm,unarrayTableerm,newTemp());
 				// cout<<"getmul"<<endl;
@@ -1308,13 +1384,16 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 			}
 			else if(ctx->Div())
 			{
-				auto name = nameM+'/'+nameU;
+				//auto name = nameM+'/'+nameU;
 				if(vpU!=nullptr && vpM !=nullptr)
 				{
 					float u = *vpU;
 					int m = *vpM;
 					float v = m/u;
+					auto name = to_string(v);
 					module->createFloat(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				auto div = builder.createFDivInst(multerm,unarrayTableerm,newTemp());
 				// cout<<"getdiv"<<endl;
@@ -1335,13 +1414,16 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 			unarrayTableerm = builder.createIToFInst(unarrayTableerm, newTemp());
 			if(ctx->Mul())
 			{
-				auto name = nameM+'*'+nameU;
+				//auto name = nameM+'*'+nameU;
 				if(vpU!=nullptr && vpM !=nullptr)
 				{
 					int u = *vpU;
 					float m = *vpM;
 					float v = u*m;
+					auto name = to_string(v);
 					module->createFloat(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				auto mul = builder.createFMulInst(multerm,unarrayTableerm,newTemp());
 				// cout<<"getmul"<<endl;
@@ -1349,13 +1431,16 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 			}
 			else if(ctx->Div())
 			{
-				auto name = nameM+'/'+nameU;
+				//auto name = nameM+'/'+nameU;
 				if(vpU!=nullptr && vpM !=nullptr)
 				{
 					int u = *vpU;
 					float m = *vpM;
 					float v = m/u;
+					auto name = to_string(v);
 					module->createFloat(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				auto div = builder.createFDivInst(multerm,unarrayTableerm,newTemp());
 				// cout<<"getdiv"<<endl;
@@ -1374,13 +1459,16 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 			auto vpM = module->getFloat(nameM);
 			if(ctx->Mul())
 			{
-				auto name = nameM+'*'+nameU;
+				//auto name = nameM+'*'+nameU;
 				if(vpU!=nullptr && vpM !=nullptr)
 				{
 					float u = *vpU;
 					float m = *vpM;
 					float v = m*u;
+					auto name = to_string(v);
 					module->createFloat(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				auto mul = builder.createFMulInst(multerm,unarrayTableerm,newTemp());
 				// cout<<"getmul"<<endl;
@@ -1394,7 +1482,10 @@ any SysYIRGenerator::visitMulExp(SysYParser::MulExpContext *ctx)
 					float u = *vpU;
 					float m = *vpM;
 					float v = m/u;
+					auto name = to_string(v);
 					module->createFloat(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				auto div = builder.createFDivInst(multerm,unarrayTableerm,newTemp());
 				// cout<<"getdiv"<<endl;
@@ -1441,7 +1532,7 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 			auto vpM = module->getInteger(nameM);
 			if(ctx->Add())
 			{
-				auto name = nameA+'+'+nameM;
+				//auto name = nameA+'+'+nameM;
 				// cout<<"add code : "<<name<<endl;
 				if(vpA!=nullptr && vpM !=nullptr)
 				{
@@ -1449,7 +1540,10 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 					int a = *vpA;
 					int m = *vpM;
 					int v = a+m;
+					auto name = to_string(v);
 					module->createInteger(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				// cout<<"getadd"<<endl;
 				auto add = builder.createAddInst(addterm, multerm,newTemp());
@@ -1458,13 +1552,16 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 			}
 			else if(ctx->Sub())
 			{
-				auto name = nameA+'-'+nameM;
+				//auto name = nameA+'-'+nameM;
 				if(vpA!=nullptr && vpM !=nullptr)
 				{
 					int a = *vpA;
 					int m = *vpM;
 					int v = a-m;
+					auto name = to_string(v);
 					module->createInteger(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				auto sub = builder.createSubInst(addterm, multerm, newTemp());
 				// cout<<"getsub"<<endl;
@@ -1481,13 +1578,16 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 			multerm = builder.createIToFInst(multerm, newTemp());
 			if(ctx->Add())
 			{
-				auto name = nameA+'+'+nameM;
+				//auto name = nameA+'+'+nameM;
 				if(vpA!=nullptr && vpM !=nullptr)
 				{
 					float a = *vpA;
 					int m = *vpM;
 					float v = a+m;
+					auto name = to_string(v);
 					module->createFloat(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				// cout<<"getfloatadd"<<endl;
 				auto add = builder.createFAddInst(addterm, multerm,newTemp());
@@ -1495,13 +1595,16 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 			}
 			else if(ctx->Sub())
 			{
-				auto name = nameA+'-'+nameM;
+				//auto name = nameA+'-'+nameM;
 				if(vpA!=nullptr && vpM !=nullptr)
 				{
 					float a = *vpA;
 					int m = *vpM;
 					float v = a-m;
+					auto name = to_string(v);
 					module->createFloat(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				auto sub = builder.createFSubInst(addterm, multerm,newTemp());
 				// cout<<"getfloatsub"<<endl;
@@ -1518,13 +1621,16 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 			addterm = builder.createIToFInst(addterm, newTemp());
 			if(ctx->Add())
 			{
-				auto name = nameA+'+'+nameM;
+				//auto name = nameA+'+'+nameM;
 				if(vpA!=nullptr && vpM !=nullptr)
 				{
 					int a = *vpA;
 					float m = *vpM;
 					float v = a+m;
+					auto name = to_string(v);
 					module->createFloat(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				// cout<<"getfloatadd"<<endl;
 				auto add = builder.createFAddInst(addterm, multerm,newTemp());
@@ -1533,13 +1639,16 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 			}
 			else if(ctx->Sub())
 			{
-				auto name = nameA+'-'+nameM;
+				//auto name = nameA+'-'+nameM;
 				if(vpA!=nullptr && vpM !=nullptr)
 				{
 					int a = *vpA;
 					float m = *vpM;
 					float v = a-m;
+					auto name = to_string(v);
 					module->createFloat(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				auto sub = builder.createFSubInst(addterm, multerm,newTemp());
 				return (Value*)sub;
@@ -1553,13 +1662,16 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 			auto vpM = module->getFloat(nameM);
 			if(ctx->Add())
 			{
-				auto name = nameA+'+'+nameM;
+				//auto name = nameA+'+'+nameM;
 				if(vpA!=nullptr && vpM !=nullptr)
 				{
 					float a = *vpA;
 					float m = *vpM;
 					float v = a+m;
+					auto name = to_string(v);
 					module->createFloat(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				auto add = builder.createFAddInst(addterm, multerm, newTemp());
 			
@@ -1567,13 +1679,16 @@ any SysYIRGenerator::visitAddExp(SysYParser::AddExpContext *ctx)
 			}
 			else if(ctx->Sub())
 			{
-				auto name = nameA+'+'+nameM;
+				//auto name = nameA+'+'+nameM;
 				if(vpA!=nullptr && vpM !=nullptr)
 				{
 					float a = *vpA;
 					float m = *vpM;
 					float v = a-m;
+					auto name = to_string(v);
 					module->createFloat(name,v);
+					auto result = ConstantValue::get(v,name);
+					return (Value*)result;
 				}
 				auto sub = builder.createFSubInst(addterm, multerm,newTemp());
 				// cout<<"getfloatsub"<<endl;
