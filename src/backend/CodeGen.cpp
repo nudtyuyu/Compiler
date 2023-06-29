@@ -432,6 +432,12 @@ namespace backend {
         auto tmp = regm.query(nullptr, {pointer, value});
         auto regs = tmp.second;
         code += tmp.first;
+        auto valueEntry = curBB->getSymTable()->query(value->getName());
+        if(valueEntry!=nullptr && valueEntry->isConstant())
+        {
+        	code += space + "ldr    " + regm.toString(regs[1]) + ", [" + regm.toString(regs[1]) + "]\n";
+
+        }
         code += space + "str    " + regm.toString(regs[1]) +  ", [" + regm.toString(regs[0]) +"]"  + endl;
         
         return code;
@@ -484,7 +490,7 @@ namespace backend {
         auto tmp = regm.query(nullptr, {returnValue});
         code += tmp.first;
         auto dstRegId = tmp.second[0];
-        if(constVal!=nullptr)
+        /*if(constVal!=nullptr)
         {
         	//TODO: float
         	if(constVal->isInt())
@@ -492,24 +498,23 @@ namespace backend {
         			auto digit = constVal->getInt();
         			code += space + "movs   " + regm.toString(dstRegId) + ", "+ "#"+ to_string(digit) +endl;
         		}
+        }*/
+        
+        auto valueName = returnValue->getName();
+        auto val = curBB->getSymTable()->query(valueName);
+        	// auto glbMap = module->getGlobalValues();
+        	//auto Reg = regm.getReg(returnValue);
+        auto addr = regm.getAddress(returnValue);
+        auto offset = regm.getOffset(returnValue);
+       	if(addr != 0)
+        {
+        	//global
+        	code += space + "movw   " + regm.toString(dstRegId) + ", "+ "#:lower16:"+ valueName +endl;
+        	code += space + "movt   " + regm.toString(dstRegId) + ", "+ "#:upper16:"+ valueName +endl;
+        	code += space + "ldr    " + regm.toString(dstRegId) + ", "+ "[" + regm.toString(dstRegId) + "]" +endl;
         }
         else
         {
-        	auto valueName = returnValue->getName();
-        	// auto val = curBB->getSymTable()->query(valueName);
-        	// auto glbMap = module->getGlobalValues();
-        	//auto Reg = regm.getReg(returnValue);
-            auto addr = regm.getAddress(returnValue);
-            auto offset = regm.getOffset(returnValue);
-        	if(addr != 0)
-        	{
-        		//global
-        		code += space + "movw   " + regm.toString(dstRegId) + ", "+ "#:lower16:"+ valueName +endl;
-        		code += space + "movt   " + regm.toString(dstRegId) + ", "+ "#:upper16:"+ valueName +endl;
-        		code += space + "ldr    " + regm.toString(dstRegId) + ", "+ "[" + regm.toString(dstRegId) + "]" +endl;
-        	}
-        	else
-        	{
         		
         		
         			//auto tmp = regm.query(var->getValue());
@@ -531,7 +536,11 @@ namespace backend {
         			// }
         			
         		//TODO: array[offset]
-       		}
+       	}
+       	if(val!=nullptr && val->isConstant()==true)
+       	{
+       		// constant variable
+       	    code += space + "ldr    " + regm.toString(dstRegId) + ", [" + regm.toString(dstRegId) + "]" + endl;
        	}
         code += space + "mov    " + regm.toString(RegManager::RegId(0)) + ", " + regm.toString(dstRegId) + endl;
         return code;
